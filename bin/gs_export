@@ -1,0 +1,10 @@
+#!/bin/sh
+
+umask 0002
+
+CP=.:../expimp-ce/build/libs/griddb-expimp-ce-all.jar
+
+java -Xmx2048m  -Dlogback.configurationFile=gs_expimp_logback.xml \
+	-classpath "$CP:$CLASSPATH" \
+	com.toshiba.mwcloud.gs.tools.expimp.exportMain "$@"
+
