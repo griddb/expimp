@@ -1,0 +1,32 @@
+apply plugin: 'java'
+ 
+repositories{
+    mavenCentral()
+    jcenter()
+}
+ 
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+}
+
+def gridstoreVersion = '4.6.1'
+ 
+dependencies { 
+    implementation 'commons-io:commons-io:2.4'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.2.3'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.2.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.2.3'
+    implementation 'javax.json:javax.json-api:1.0'
+    implementation 'com.sun.jersey:jersey-client:1.17.1'
+    implementation 'com.sun.jersey:jersey-core:1.17.1'
+    implementation files ('../3rd_party/orion-ssh2/orion-ssh2-214.jar')
+    implementation 'com.github.griddb:gridstore:'+"${gridstoreVersion}"
+}
+
+compileJava.options.encoding = 'UTF-8' 
+compileTestJava.options.encoding = 'UTF-8'
+javadoc.options.encoding = 'UTF-8'
