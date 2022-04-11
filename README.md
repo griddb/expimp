@@ -62,6 +62,7 @@ $ cd bin
 $ ./gs_import -u admin/[password] -d ../impSample/collection --all
 $ ./gs_import -u admin/[password] -d ../impSample/timeseries --all
 $ ./gs_import -u admin/[password] -d ../impSample/arrayData --all
+```
 
 - Export sample data
 ```
@@ -69,6 +70,7 @@ $ cd bin
 $ ./gs_export -u admin/[password] -d outCollection -c c001
 $ ./gs_export -u admin/[password] -d outTimeseries -c t001
 $ ./gs_export -u admin/[password] -d outArrayData -c colb
+```
 
 ## Document
 
