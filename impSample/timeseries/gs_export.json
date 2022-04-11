@@ -1,0 +1,18 @@
+
+{
+    "version":"4.3.0",
+    "startTime":"2022-04-07T18:02:44.052+0900",
+    "endTime":"2022-04-07T18:02:50.168+0900",
+    "address":"239.0.0.1:31999",
+    "user":"admin",
+    "containerCount":1,
+    "rowFileType":"csv",
+    "parallel":1,
+    "container":[
+        {
+            "database":"public",
+            "name":"t001",
+            "metafile":"public.t001_properties.json"
+        }
+    ]
+}

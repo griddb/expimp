@@ -1,0 +1,18 @@
+
+{
+    "version":"4.3.0",
+    "startTime":"2022-04-07T18:03:02.388+0900",
+    "endTime":"2022-04-07T18:03:10.166+0900",
+    "address":"239.0.0.1:31999",
+    "user":"admin",
+    "containerCount":1,
+    "rowFileType":"csv",
+    "parallel":1,
+    "container":[
+        {
+            "database":"public",
+            "name":"colb",
+            "metafile":"public.colb_properties.json"
+        }
+    ]
+}

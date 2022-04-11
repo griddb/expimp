@@ -1,0 +1,46 @@
+
+{
+    "version":"4.6.0",
+    "database":"public",
+    "container":"c001",
+    "containerType":"COLLECTION",
+    "containerFileType":"csv",
+    "containerFile":"public.c001.csv",
+    "partitionNo":40,
+    "columnSet":[
+        {
+            "columnName":"name",
+            "type":"string",
+            "notNull":true
+        },
+        {
+            "columnName":"status",
+            "type":"boolean",
+            "notNull":false
+        },
+        {
+            "columnName":"count",
+            "type":"long",
+            "notNull":false
+        }
+    ],
+    "rowKeySet":[
+        "name"
+    ],
+    "indexSet":[
+        {
+            "columnNames":[
+                "name"
+            ],
+            "type":"TREE",
+            "indexName":null
+        },
+        {
+            "columnNames":[
+                "count"
+            ],
+            "type":"TREE",
+            "indexName":null
+        }
+    ]
+}
