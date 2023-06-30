@@ -2,6 +2,23 @@
 
 In the GridDB export/import tools, to recover a database from local damages or the database migration process, save/recovery functions are provided in the database and container unit.
 
+To more easily handle output data, the export tool switches the output format of row data files according to the container type. There are two types of export containers:
+- A container that sequentially accumulates data and thus tends to grow in size is called **date accumulation container**. For this type of export container, row data files are output for each date.
+- The rest of containers is called **registration update container**. For this type of export container, row data files are output for each container.
+
+The following table summarizes the features of containers. 
+
+| container       | table partitioning    | partitioning type            | partitioning key         | export container type                                 |
+|----------------|--------------------------------|----------------------------------------|--------------------------------|------------------------------------------------|
+| collection   | applicable                           | hash partitioning             | Timestamp type<br>other than Timestamp type | registration update container                               |
+| collection   | applicable                           | interval partitioning             | Timestamp type<br>other than Timestamp type | date accumulation container<br>registration update container                              |
+| collection   | applicable                           | interval hash partitioning             | Timestamp type<br>other than Timestamp type | date accumulation  container<br>registration update container                              |
+| collection   | not applicable                           | -             | Timestamp type<br>other than Timestamp type | registration update container                               |
+| time series container   | applicable                           | hash partitioning           | Timestamp type<br>other than Timestamp type | registration update container                               |
+| time series container   | applicable                           | interval partitioning           | Timestamp type<br>other than Timestamp type | date accumulation  container<br>registration update container                               |
+| time series container   | applicable                           | interval hash partitioning           | Timestamp type<br>other than Timestamp type | date accumulation  container<br>registration update container                               |
+| time series container   | not applicable                           | -          | - | date accumulation  container                               |
+
 ## Installed directories and files
 
 The export tool saves the container and row data of a GridDB cluster in the file below. A specific container can also be exported by specifying its name.
@@ -17,7 +34,7 @@ The import tool imports the container and export execution data files, and recov
 
 Container data files are composed of **metadata files** and **row data files**.
 
-A metadata file is a file in the json format which contains the container type and schema, the index set up, and the trigger data.
+A metadata file is a json-format file which contains the container type and schema, and the index data that has been set up.
 
 There are 2 types of row data file, one of which is the **CSV data file** in which container data is stored in the CSV format, and the other is the **binary data file** in which data is stored in a zip format.
 
@@ -29,13 +46,26 @@ There are 2 types of row data file, one of which is the **CSV data file** in whi
 
 See [Format of a container data file](#format_of_container_data_file) for details of the contents described in each file.
 
-In addition, there are 2 types of container data file as shown below depending on the number of containers to be listed.
+
+For **registration update containers**, row data files are output on a per-container basis.
+Depending on the number of containers to be listed, there are two types of container data files as shown below:
 - Single container configuration: Holds 1 container data file for each container
 - Multi-container configuration: Consolidates multiple containers into a single container data file
 
-Hereinafter, container data files of various configurations will be written as **single container data file** and **multi-container data file**.
+For **date accumulation containers**, row data files are output on a per-day basis.
+- date container configuration: Data in a container is split on a per-day basis, and each day has one container data file. 
 
-When a large container is specified as a single container data file and export is executed, management becomes troublesome as a large amount of metadata files and row data files are created.  On the other hand, even if a large container is specified as a multi-container data file, only 1 metadata file and row data file is output.
+|  Export container type           | Output container configuration      | Description |
+| ---------------------- | -------------------- | ------|
+| registration update container       | single container configuration  | configuration in which one container data file is created for each container. |
+|                        | multi-container configuration    | configuration in which multiple containers are grouped together into one container data file. |
+| date accumulation container | date container configuration   | Data in a container is split on a per-day basis to create a container data file. |
+
+
+From hereon, container data files for each configuration is described as a **single container data file**, a **multi-container data file**, and **date container data file**, respectively.
+
+
+In registration update containers, when export is executed by specifying a large container in a  single container data file, file management becomes cumbersome as a large amount of metadata files and row data files are created. Contrastingly, with a multi-container data file, even when a large container is specified, the only files that are output are one meta data file and one row data file.
 
 Therefore, it is recommended that these 2 configurations be **used differently depending on the application**.
 
@@ -46,6 +76,9 @@ A single container data file is used in the following cases.
 A multi-container data file is used in the following cases.
 - To backup a specific container group.
 - To move a database to a different GridDB cluster.
+
+In date accumulation containers, there is no such distinction because there is only one type of output file configuration.
+
 
 ### Export execution data file
 
@@ -87,6 +120,7 @@ The property file contains the following settings.
 | failoverTimeout | － | 10 | Specify the failover time to repeat retry starting from the time a node failure is detected. This is also used in the timeout of the initial connection to the cluster subject to import/export. Increase the value when performing a process such as registering/acquiring a large volume of data in/from a container. (Unit: second)    |
 | jdbcLoginTimeout | － | 10 | Specify the time of initial connection timeout for JDBC. (Unit: second)       |
 | notificationInterfaceAddress  | － | \*OS-dependent  | To configure the cluster network in multicast mode when multiple network interfaces are available, specify the IP address of the interface to receive the multicast packets from.  |
+| intervalTimeZone         | －                           | GMT         | To export to or import from a date accumulation container, set "TimeZone" as the "intervals" option of the export and import commands. As the TimeZone settings, specify either the abbreviated Standard Time name or the time difference from GMT in GMT+HH:mm format.  |
 
 <a id="export_function"></a>
 ## Export function
@@ -121,7 +155,7 @@ There are 3 ways to specify a container from a GridDB cluster, by specifying all
 - [Example]
 
   ``` example
-  $ gs_export --db db001 db002 -u admin/admin　//Enumerate DB name. Container in the DB Container in the DB
+  $ gs_export --db db001 db002 -u admin/admin  //Enumerate DB name. Container in the DB Container in the DB
   ```
 
 - [Memo]
@@ -139,8 +173,8 @@ There are 3 ways to specify a container from a GridDB cluster, by specifying all
 - [Example]
 
   ``` example
-  $ gs_export --container c001 c002 -u admin/admin　　　 //Enumerate container name
-  $ gs_export --containerregex "^c0" -u admin/admin　　　//regular expression specification: Specify containers whose container name start with c0
+  $ gs_export --container c001 c002 -u admin/admin       //Enumerate container name
+  $ gs_export --containerregex "^c0" -u admin/admin      //regular expression specification: Specify containers whose container name start with c0
   ```
 
 - [Memo]
@@ -151,17 +185,27 @@ There are 3 ways to specify a container from a GridDB cluster, by specifying all
 
 #### How to specify a row  
 
-Rows located by a search query can be exported by specifying a search query to remove rows from a container.
-All rows stored in a container which has not been specified in the search query will be exported.
+In exporting a container, it is possible to specify  the condition for determining which rows to output.
+To specify this condition, the following methods are provided for each export container type:
 
-Specify search query  
-- Specify the definition file describing the container name and search query with the --filterfile option. Describe the search query and its corresponding container in the definition file.
+|  Export import type             | Specification type                  | Method    |
+| ------------------------- | ---------------------------- | ------- |
+| registration update container         | specification using a search query      | Specify by defining a container name and a search query.      |
+| date accumulation container | specification using a time interval | Specify the date range during which a row (TIMESTAMP type) is extracted. |
 
-[Example] Execution example
+For a container for which no condition is specified, all rows stored in it will be exported.
+
+◆Specification using a search query
+
+ This is a method that can be used when the export container type is a registration update container.
+ 
+- Using the --filterfile option, specify a definition file that describes a container name and a search query. In the definition file, describe the name of a container to which a search query is applied,  and the search query.
+
+[Example of running the command]
 
 ``` example
 $ gs_export -c c001 c002 -u admin/admin --filterfile filter1.txt
-　　
+
 $ gs_export --all -u admin/admin --filterfile filter2.txt
 ```
 
@@ -182,7 +226,27 @@ cont_year2014   :select * where timestamp > TIMESTAMP('2014-05-21T08:00:00.000Z'
 - Execute the export test function to check whether the description of the definition file is correct.
 
 
-#### How to specify user access rights  
+◆Specification using a time interval
+
+ This is a method that can be used when the export container type is a date accumulation container.
+
+- Using the --intervals option, specify the date range for which rows are retrieved. The system would then compare this data range with the container key (for a date accumulation container, TIMESTAMP type).
+
+[Example of running the command]
+
+``` example
+$ gs_export -c tsc001 tsc002 -d ./2021/ --intervals 20210101:20211231
+
+$ gs_export --all -u admin/admin -d ./20210131/ --intervals 20210101:20210131
+
+```
+
+[Memo]
+- When a time interval is not specified, data in the target containers is output for all periods.
+- The --all option specifies all containers, of which only date accumulation containers are used for output.
+- As multiple row data files are output, it is recommended to specify the destination directory using the -d option together with the --all option.
+
+### How to specify user access rights  
 
 Information on GridDB cluster users and their access rights can also be exported.  Use the following command when migrating all data in the cluster.
 
@@ -202,7 +266,7 @@ $ gs_export --all -u admin/admin --acl
 
 A view of a GridDB cluster can also be exported as well as the container.
 
-　Specify --all option or --db option to export the view of the database to be exported.
+  Specify --all option or --db option to export the view of the database to be exported.
 
 ``` example
 $ gs_export --db public -u admin/admin
@@ -219,6 +283,7 @@ Export Completed.
 ### Specifying the output format of a row data file
 
 A CSV data file or binary data file can be specified as the output format of a row data file.
+The -d option can be used for both a registration update container and a date accumulation container.
 
 - Output in the CSV data file  
   - Execute an export command without specifying the --binary option
@@ -232,11 +297,13 @@ A CSV data file or binary data file can be specified as the output format of a r
 
 ``` example
 $ gs_export -c c001 c002 -u admin/admin --binary
-　　
+    
 $ gs_export --all -u admin/admin --binary 500       //Export Completed.
 ```
 
 ### Specifying the output configuration of container data file
+
+In exporting a registration update container, it is possible to specify the configuration of a container data file to be output.
 
 A single container data file to create container data file in a container unit, or a multi-container data file to output all containers to a single container data file can be specified.
 
@@ -253,7 +320,7 @@ A single container data file to create container data file in a container unit, 
 
 ``` example
 $ gs_export -c c001 c002 -u admin/admin --out test
-　　
+    
 $ gs_export --all -u admin/admin --out           //file is created with the date
 ```
 
@@ -311,6 +378,7 @@ public.container_1                                 53          10
 public.container_4                                 58          20
 
 Number of target container:5 ( Success:5 Failure:0 )
+
 The number of target views : 15
 Export Completed.
 ```
@@ -364,7 +432,7 @@ $ gs_export -c c002 c001 -u admin/admin --silent
 
 ## Import function
 
-Import the container data file into the GridDB cluster.
+Import the container data file data into the GridDB cluster.
 
 ### Types of data source for import
 
@@ -404,7 +472,7 @@ There are 3 ways to specify a container, by specifying all the containers in the
 - [Example]
 
   ``` example
-  $ gs_import --db db001 db002 -u admin/admin　//Enumerate DB name. Container in the DB Container in the DB
+  $ gs_import --db db001 db002 -u admin/admin  //Enumerate DB name. Container in the DB Container in the DB
   ```
 
 **(3) Specify container individually**
@@ -418,8 +486,8 @@ There are 3 ways to specify a container, by specifying all the containers in the
 - [Example]
 
   ``` example
-  $ gs_import --container c001 c002 -u admin/admin　//Enumerate container name
-  $ gs_import --containerregex "^c0" -u admin/admin　　　//regular expression specification: Specify containers whose container name start with c0
+  $ gs_import --container c001 c002 -u admin/admin  //Enumerate container name
+  $ gs_import --containerregex "^c0" -u admin/admin      //regular expression specification: Specify containers whose container name start with c0
   ```
 
 [Points to note]
@@ -466,11 +534,18 @@ Specify --all option or --db option to import the view of the database to be imp
 
 #### Specifying a container data file
 
-Specify the container data file. If this is not specified, the file in the current directory will be processed.
+Specify a container data file to import.
+The date range for which import is executed can be specified only for a date accumulation container.
 
-- Specify the directory
-  - Specify the directory address of the container data file using the -d option.
-  - If the directory is not specified, the container data file in the current directory will be chosen instead.
+| How to specify                 |   Export container type               | Description |
+| ------------------------ | -------------------------- | ------- |
+| Specify a directory.        | registration update container       |  Specify a container to import within the directory. |
+|        -                  | data accumulation container |  same as above |
+| Specify a time interval.        | date accumulation container only       |  Specify the date range for which import is executed. |
+
+◆Specifying a directory
+  - With the --d option, specify a directory where container data files are located.
+  - If the directory is not specified, container data files in the current directory during command execution are imported.
 
 [Example]
 
@@ -487,6 +562,26 @@ $ gs_import -c c002 c001 -u admin/admin  -d /data/expdata
 
 [Memo]
 - If the export execution data file (gs_export.json) does not exist, e.g. because the container data file is created manually; specify the metadata file (XXXXX_properties.json) using the -f option. If the -f command is not specified, import will fail.
+
+◆Specifying a time interval
+ - With the --intervals option, specify the date range for which import is executed.
+ - If the date range is not specified, container data files will be imported for all periods.
+
+[Example]
+
+``` example
+//Specify all containers in the current directory and import only the data in a specific interval that has been specified.
+$ gs_import --all -u admin/admin --intervals 20210101:20211231
+
+//Specify multiple databases in a specific directory and import only the data in a specific interval that has been specified.
+$ gs_import --db db002 db001 -u admin/admin -d ./2021/ --intervals 20210101:20211231
+
+//Specify multiple containers in a specific directory and import only the data in a specific interval that has been specified.
+$ gs_import -c c002 c001 -u admin/admin  -d ./20210131/ --intervals 20210101:20210131
+```
+
+[Memo]
+- This "intervals " option is applicable only to export data in a date accumulation container. It cannot be specified for a registration update container.
 
 
 #### Getting a container list
@@ -514,14 +609,14 @@ Data can be added or replaced by specifying the next option. During data registr
 
 - Add/update data  
   - Data can be registered and updated in an existing container by specifying the --append option
-  - Data can be added, registered or updated only if the specified container data, such as the schema, index and trigger setting, are the same as the existing container.
+  - Data can be added, registered or updated only if the  existing container and the specified container have the same container definition data, including the container schema and index setting data.
   - The registration procedure according to the type of container is as follows.
 
     | Container type | Row key assigned | Behavior                                                                     |
     |----------------|------------|--------------------------------------------------------------------------|
     | Collection | TRUE | Columns with the same key will be updated while data with different keys will be added.           |
     |                | FALSE | All row data will be added and registered.                                         |
-    | Timeseries | TRUE | If compression is not specified, the time will be added and registered if it is newer than the existing registration data. <br>If the time is the same as the existing data, the column data will be updated. <br>If compression is specified, only rows newer than the existing data can be added.             |
+    | Timeseries | TRUE | The data will be added and registered if it has more recent time than the existing registration data. <br>If the data has the same time as the existing data, the column data will be updated. |
 
   - For timeseries containers, if the time of the data to be registered is the same as the existing data, the existing row is overwritten. The number of rows is not increased.
   - By specifying the --schemaCheckSkip option, the existing container definition data is not checked.
@@ -537,12 +632,12 @@ $ gs_import -c c002 c001 -u admin/admin  --append
 Import initiated (Append Mode)
 Import completed
 Success:2 Failure:0
-　
+  
 $ gs_import -c c002 c001 -u admin/admin  --replace
 Import initiated (Replace Mode)
 Import completed
 Success:2 Failure:0
-　
+  
 $ gs_import --all  -u admin/admin  -d /datat/expdata   --replace
 ```
 
@@ -592,6 +687,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | --out \[\<file identifier\>\] | | Specify this when using the multi-container format for the file format of the output data. The single container format will be used by default. The number of characters in the file identifier is limited to 20. <br>If the file identifier is specified, the file identifier will be used as the file name, and if it is omitted, the output start date and time will be used as the file name.    |
   | --binary \[\<file size\>\] | | Specify this when using the binary format for the output format of the row data file. The CSV format will be used by default. <br>Specify the output file size in MB. Default is 100MB. A range from 1 to 1000 (1GB) can be specified.      |
   | --filterfile \<definition file name\> | | Specify the definition file in which the search query used to export rows is described. All rows are exported by default.   |
+  | --intervals YYYYMMdd:YYYYMMdd          |      | If a container to be exported from is a date accumulation container, specify the date range for which rows are retrieved for export in "YYYYMMdd:YYYYMMdd" format, consisting of a start date and an end date separated by a colon. If the date range is not specified, all rows will be exported.  The "intervals" option cannot be combined with the "filterfile" option.   |
   | --parallel \<no. of parallel executions\> | | Execute in parallel for the specified number. When executed in parallel, the export data will be divided by the same number as the number of parallel executions. This can be specified only for the multi-container format (when the --out option is specified). A range from 2 to 32 can be specified.      |
   | --acl | | Data on the database, user, access rights will also be exported. This can be specified only if the user is an administrator user and --all option is specified. |
   | --prefixdb \<database name\> | | If a --container option is specified, specify the database name of the container. The containers in the default database will be processed if they are omitted. |
@@ -601,13 +697,14 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | --silent | | Operating display is not output.   |
   | --schemaOnly                |   | Export container definitions only; row data is not exported.   |
   | --version | | Display the version of the tool.      |
-  | \-h\|--help    |          | Display the command list as a help message. 　      |
+  | \-h\|--help    |          | Display the command list as a help message.         |
 
 [Memo]
 -   If the -t (--test) option is specified, a query will be executed until the data is fetched. Container data file will not be created.
 -   If the -v (--verbose) option is specified, a message will appear during processing. If omitted, a message will appear only when there is an error.
 -   Create the respective directory and file if the specified directory path does not exist in the -d (--directory) option, and the specified file name does not exist in the --out option.
 -   If a --containerregex option is specified, Java regular expressions can be specified for the container names. See the Java "Class Pattern" for details.
+-   In specifying the --intervals option, if a start date and/or an end date are unknown, specify an extremely low value (19700101, for example) and/or an extremely high value (99991231, for example), respectively.
 
 ### Import command
 
@@ -633,6 +730,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | \--replace                                       |          | Delete the existing container, create a new container, and register data.          |
   | \-d\|--directory \<import target directory path\> |          | Specify the directory path of the import source. Default is the current directory.|
   | \-f\|--file \<file name\> [\<file name\> ...]   |          | Specify the container data file to be imported. Multiple specifications allowed. All container data files of the current directory or directory specified in d (--directory) will be applicable by default.   |
+  | --intervals YYYYMMdd:YYYYMMdd          |      | If a container to be imported from is a date accumulation container, specify the date range for which rows data files are retrieved for import in "YYYYMMdd:YYYYMMdd" format, consisting of a start date and an end date separated by a colon. If the date range is not specified, all row data files will be imported.   |
   | \--count \<commit count\>                        |          | Specify the number of input cases until the input data is committed together. |
   | \--acl                                           |          | Data on the database, user, access rights will also be imported. This can be specified only if the user is an administrator user and the --all option is specified for data exported by specifying the --acl option.   |
   | \--prefixdb \<database name\>                    |          | If a --container option is specified, specify the database name of the container. The containers in the default database will be processed if they are omitted.        |
@@ -648,7 +746,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 -   If -l (--list) option is specified, and options other than the -d (--directory) and -f (--file) option are specified, an option argument error will occur.
 -   If the -v (--verbose) option is specified, a message will appear during processing. If omitted, a message will appear only when there is an error.
 -   If --containerregex option is specified, Java regular expressions can be used to specify the container names. See the Java "Class Pattern" for details.
-
+-   In specifying the --intervals option, if a start date and/or an end date are unknown, specify an extremely low value (19700101, for example) and/or an extremely high value (99991231, for example), respectively.
 
 <a id="format_of_container_data_file"></a>
 ## Format of container data file
@@ -665,17 +763,16 @@ The metadata file stores the container data in the JSON format.  The container d
 | \<Container name\>                | Name of the container.                                               |
 | Container type                    | Refers to a collection or time series container.                         |
 | Schema data                       | Data of a group of columns constituting a row. Specify the column name, data type, and column constraints.         |
-| Compression configuration data    | Compression type data to be configured in a Time series data. Set up thinning compression with error, thinning compression without error, or no compression.  |
-| Index setting data                | Index type data set in a container. Availability of index settings. Specify the type of index e.g. hash index, spatial index, tree index, etc.    |
-| Trigger (event notification) data | Notification is triggered when a container is updated (PUT/DELETE) by the JMS or REST interface.        |
+| Index setting data                | Index type data set in a container. Availability of index settings. Specify the type of index, including tree index and spatial index.   |
 | Row key setting data              | Set up a row key when collection container is used. For time series containers, either there is no row key set or the default value, if set, will be valid. |
 | Table partitioning data           | Specify table partitioning data.                      |
+| Time interval information         | For a date registration container, specify information about a row data file that is split on a per-day basis.  |
 
 The tag and data items of the metadata in the JSON format are shown below. Tags that are essential for new creations by the user are also listed (tag setting condition).
 
-| field | Item | Note | Setting conditions　      |
+| field | Item | Note | Setting conditions        |
 |-------------------------|-----------------------------|---------|------------------|
-| Common parameters           | 　                          |                                |                   |
+| Common parameters           |                             |                                |                   |
 | database | \<Database name\> | \<Database name\> | Arbitrary, "public" by default        |
 | container | \<Container name\> | \<Container name\> | Required                                |
 | containerType | Container type | Specify either COLLECTION or TIME_SERIES | Required       |    
@@ -684,25 +781,15 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
 | dataAffinity | Data affinity name | Specify the data affinity name. | Arbitrary             |
 | partitionNo | Partition | Null string indicates no specification. | Arbitrary, output during export. Not used even if it is specified when importing.    |
 | columnSet | Column data set (, schema data) | Column data needs to match when adding data to an existing container | Required    |
-| 　　columnName | Column name | | Required              |
-| 　　type | JSON Data type | Specify either of the following values: BOOLEAN/ STRING/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP/ GEOMETRY/ BLOB/ BOOLEAN\[\]/ STRING\[\]/ BYTE\[\] /SHORT. \[\]/ INTEGER\[\]/ LONG\[\]/ FLOAT\[\]/ DOUBLE\[\]/ TIMESTAMP\[\]. | Required    |
-| 　　notNull | NOT NULL constraint | true/false | Arbitrary, "false" by default   |
+|     columnName | Column name | | Required              |
+|     type | JSON Data type | Specify either of the following values: BOOLEAN/ STRING/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP/ GEOMETRY/ BLOB/ BOOLEAN\[\]/ STRING\[\]/ BYTE\[\] /SHORT. \[\]/ INTEGER\[\]/ LONG\[\]/ FLOAT\[\]/ DOUBLE\[\]/ TIMESTAMP\[\]. | Required    |
+|     notNull | NOT NULL constraint | true/false | Arbitrary, "false" by default   |
 | rowKeyAssigned | Row key setting (\*1) | specify either true/false<br>Specifying also rowKeySet causes an error | Arbitrary, "false" by default     |
 | rowKeySet | Row key column names | Specify row key column names in array format.<br>The row key needs to match when adding data to an existing container | Arbitrary (\*2)    |
 | indexSet | Index data set | Can be set for each column.  Non-existent column name will be ignored or an error will be output. | Arbitrary      |
-| 　　columnNames | Column names | Specify column names in array format. | Arbitrary (essential when indexSet is specified)     |
-| 　　type | Index type | Specify either of the following values: HASH (STRING/ BOOLEAN/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP) SPATIAL (GEOMETRY), TREE (STRING/ BOOLEAN/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP). | Arbitrary (essential when indexSet is specified)      |
-| 　　indexName | Index name | Index name | Arbitrary, not specified either by default or when null is specified.     |
-| triggerInfoSet | Trigger settings | | Arbitrary    |
-| 　　eventName | Trigger name | Trigger name | Arbitrary (essential when triggerInfoSet is specified)     |
-| 　　notificationType | Notification method | Specify either JMS or REST. | Arbitrary (essential when triggerInfoSet is specified)      |
-| 　　targetEvents | Event to be monitored | Specify either PUT or DELETE. | Arbitrary (essential when triggerInfoSet is specified)     |
-| 　　targetColumnNames | Column name | | Arbitrary column subject to notification (multiple columns can be specified using commas to separate them) The "," (comma) separator is used, and an error will occur if a non-existent column name is specified. |
-| 　　notificationURI | Destination URI of notification | | Arbitrary (essential when triggerInfoSet is specified)    |
-| 　　JmsDestinationType | Type of destination | Specify either topic or queue. | Valid only when notificationType is JMS     |
-| 　　JmsDestinationName | Name of destination | | Essential when notificationType is JMS      |
-| 　　JmsUser | \<User name\> | | Essential when notificationType is JMS       |
-| 　　JmsPassword | \<Password\> | | Essential when notificationType is JMS      |
+|     columnNames | Column names | Specify column names in array format. | Arbitrary (essential when indexSet is specified)     |
+|     type | Index type | Specify one of the following values: TREE (STRING/ BOOLEAN/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP) or SPATIAL (GEOMETRY). | Arbitrary (essential when indexSet is specified)      |
+|     indexName | Index name | Index name | Arbitrary, not specified either by default or when null is specified.     |
 | Table partitioning data  |                 |     |      |
 | tablePartitionInfo | Table partitioning data | For Interval-Hash partitioning, specify the following group of items for both Interval and Hash as an array in that order | Arbitrary     |
 | type | Table partitioning type | Specify either HASH or INTERVAL | Essential if tablePartitionInfo is specified |
@@ -714,20 +801,10 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
 | expirationType | Type of expiry release function | Specify "partition", when specifying partition expiry release. | Arbitrary   |
 | expirationTime | Length of expiration | Integer value | Essential if expirationType is specified  |
 | expirationTimeUnit | Elapsed time unit of row expiration | Specify either of the following values: DAY/ HOUR/ MINUTE/ SECOND/ MILLISECOND. | Essential if expirationType is specified    |
-| TIME_SERIES only parameter |              |     |   |
-| timeSeriesProperties | Compression data setting | Can only be specified when containerType is TIME_SERIES. | Arbitrary     |
-| compressionMethod | | Specify either NO, SS, or HI. | Arbitrary     |
-| compressionWindowSize | Maximum window size of a row | Integer value | Arbitrary     |
-| compressionWindowSizeUnit | Elapsed time unit of row expiration | Specify either of the following values: DAY/ HOUR/ MINUTE/ SECOND/ MILLISECOND. | Arbitrary     |
-| expirationDivisionCount | Division count of row expiration | Integer value | Arbitrary     |
-| rowExpirationElapsedTime | Elapsed time of row expiration | Integer value | Arbitrary     |
-| rowExpirationTimeUnit | Elapsed time unit of row expiration | Specify either of the following values: DAY/ HOUR/ MINUTE/ SECOND/ MILLISECOND. | Arbitrary     |
-| compressionInfoSet | Settings for each column | Can only be specified if compressionMethod is HI. | Arbitrary      |
-| 　　columnName | Column name | | Arbitrary     |
-| 　　compressionType | Compression type | Specify either RELATIVE or ABSOLUTE (RELATIVE indicates a relative value and ABSOLUTE indicates an absolute value). | Arbitrary     |
-| 　　width | Absolute error exists. Thinning and compression parameters | Floating-point number | Arbitrary, essential if compression is specified. An error occurs when both rate and span are specified.    |
-| 　　rate | Relative error exists. Thinning and compression parameters | Floating-point number | Arbitrary, can only be specified when compressionMethod is HI. In SS/NO, ignored/error occurs. An error occurs when width is also specified.     |
-| 　　span | Relative error exists. Thinning and compression parameters | Floating-point number | Arbitrary, can only be specified when compressionMethod is HI. In SS/NO, ignored/error occurs. An error occurs when width is also specified.   |
+| Time interval information |         |     |
+| timeIntervalInfo     | Time interval information         | For a date accumulation container, describe the following information in array format. | Arbitrary     |
+| containerFile        | Container data file name     | File name  | Required if timeIntervalInfo is specified |
+| boundaryValue        | Date range                | date to start container data      | Required if timeIntervalInfo is specified |
 
 - \* 1: Information output to metadata file before V4.2. Use rowKeySet in V4.3 or later.
 - \* 2: Required when containerType is TIME_SERIES and rowKeyAssigned is false.
@@ -780,8 +857,7 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
       ],
       "indexSet": [
           { "columnName": "COLUMN_ID", "type": "TREE"},
-          { "columnName": "COLUMN_ID", "type": "HASH"},
-          { "columnName": "COLUMN_STRING", "type": "HASH" }
+          { "columnName": "COLUMN_STRING", "type": "TREE" }
       ],
       "rowKeyAssigned": true
   }
@@ -804,17 +880,7 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
               { "columnName": "COLUMN_STRING", "type": "STRING" }
           ],
           "indexSet":[
-              { "columnName":" COLUMN_STRING ", "indexType": "HASH" }
-          ],
-          "triggerInfoSet":[
-              {  "eventName":" FLAG_EVENT", "notificationType":"JMS",
-                  "targetEvents":"DELETE", "targetColumnNames":"COLUMN_FLAG",
-                  "notificationURI":"http://example.com",
-                  "JmsDestinationType":"", "JmsDestinationName":"",
-                  "JmsUser":"", "JmsPassword":"" },
-              {  "eventName":"STRING_EVENT", "notificationType":"REST",
-                  "targetEvents":"PUT", "targetColumnNames":"COLUMN_STRING",
-                  "notificationURI":"" }
+              { "columnName":" COLUMN_STRING ", "indexType": "TREE" }
           ]
       },
       {
@@ -832,24 +898,7 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
           ],
           "indexSet":[
               { "columnName":" COLUMN_FLAG ", "indexType": "TREE" }
-          ],
-          "triggerInfoSet":[
-              {  "eventName":"TIMESTAMP_EVENT", "notificationType":"REST",
-                  "targetEvents":"DELETE", "targetColumnNames":"COLUMN_TIMESTAMP",
-                  "notificationURI":"",
-                  "JmsDestinationType":"", "JmsDestinationName":"",
-                  "JmsUser":"", "JmsPassword":"" }
-          ],
-          "timeSeriesProperties":[
-              { "compressMethod": "HI",
-               "compressionWindowSize":10, "compressionWindowSizeUnit":"SECOND",
-               "expirationDivisionCount":12,
-               "rowExpirationElapsedTime":1,"rowExpirationTimeUnit": "DAY"}
-           ],
-           "compressionInfoSet":[
-              { "columnName":"COLUMN_INTEGER", "compressionType":"RELATIVE",
-              "rate":"1.0E2", "span":"1.0E2" }
-           ]
+          ]
       }
   ]
   ```
@@ -898,6 +947,20 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
 [Memo]
 -   For interval-hash partitioning, it is necessary to describe the partitioning data under the tablePartitionInfo in the order of INTERVAL, HASH. An error occurs if the order of description is not right.
 
+
+[Example 4] Example of a date accumulation container
+
+Excerpt relevant to time interval information
+
+  ``` example
+    "timeIntervalInfo":[
+      {
+        "containerFile": "public.container01_2023-01-01_2023-01-02.csv",
+        "boundaryValue": "2023-01-01T00:00:00.000+0000"
+      }
+    ]
+  ```
+
 ### Row data file (binary data file)
 
 A row data file, binary data file, is in zip format and can be created by gs_export only. No readability, and cannot be edited as well.
@@ -937,19 +1000,43 @@ Describe the references to the metadata file.
   "%","metadata file name"
   ```
 
-**3. Row data section (container data and subsequent sections)**
+**3. Container name information section (immediately after the container data section)**
 
-The following section describes the row data.
-- Assign "$" at the beginning of the container name and describe the row data for the number of cases that you want to register in the container.
-- Separate the row data of the column with commas and describe them in one line of the CSV file.
+Specify the database name and the container name in a row data file.
+The format varies depending on the export container type.
+
+| Export container type               |   Format of the container name information section                  |
+| -------------------------- | ---------------------------------------- |
+| registration update container           | Specify a database name and a container name.          |
+| date registration container |  Specify a database name and a combination of a container name and a date range. |
+
+◆Database name and container name
+- Start with the U.S. dollar sign ($) and specify a database name and a container name.
 
   ``` example
   "$","database name.container name"
+  ```
+
+◆Database name and a combination of container name and date range
+- Start with the U.S. dollar sign ($) and specify a database name and a combination of a container name and the date range.
+- The "date range" consists of a start date and an end date connected by an underscore (_). More specifically, see the following example:
+
+  ``` example
+  "$","database name.container name_YYYY-MM-dd_YYYY-MM-dd"
+  ```
+
+**4. Row data section (after the container name information section)**
+
+This is where the main body of row data is described.
+
+- Specify as many number of row data as demanded to be registered in a container.
+
+  ``` example
   "value","value","value", ... (number of column definitions)
   "value","value","value", ... (number of column definitions)
-  　　：
-  　　：　　　　//Describe the number of row cases you want to register
-  　　：
+      ：
+      ：        //Describe the number of row cases you want to register
+      ：
   ```
 
 [Memo]
@@ -964,9 +1051,9 @@ The comment section can be described anywhere in the CSV data file except the he
 
 [Memo]
 -   The CSV data file of a single container data file is configured as follows.
-    -   　1. Header section, 2. Container data file data section, 3. Row data section
+    -     1. Header section, 2. Container data file data section, 3. Row data section
 -   The CSV data file of a multi-container data file is configured as follows.
-    -   　1. Header section, 2. Container data file data section, 3. Row data section (multiple)
+    -     1. Header section, 2. Container data file data section, 3. Row data section (multiple)
 
 \<File name format\>
 
@@ -991,10 +1078,10 @@ The name of the CSV data file output by the export tool is as follows.
 "3","Osaka"
 ```
 
-　
+  
 
 When the data below is included in some of the rows of the CSV data file, prepare an external object file separate from the CSV data file as an external object. List the references of the external data file in the target column of the CSV file as below.
-　 "@data type": (file name)
+   "@data type": (file name)
 
 -   BLOB data
     -   List "@BLOB:" + (file name) as BLOB data in the "value" section of the relevant column.
@@ -1032,7 +1119,7 @@ For import purposes, any file name can be used for the external object file. Lis
 
 ``` example
 //When a collection (colb) having a BYTE array in the 3rd column is exported
-　
+  
 10月  4 12:51 2017 public.colb.csv
 10月  4 12:51 2017 public.colb_0_3.byte_array
 10月  4 12:51 2017 public.colb_1_3.byte_array
@@ -1042,7 +1129,7 @@ For import purposes, any file name can be used for the external object file. Lis
 10月  4 12:51 2017 public.colb_properties.json
 ```
 
-　　
+    
 
 [Example] Description of an external object file in a single container data file is shown below.
 
@@ -1081,7 +1168,7 @@ For import purposes, any file name can be used for the external object file. Lis
   ```example
   "#2017-10-01T19:41:35.320+0900  GridDB V4.0.00"
   "#User:admin"
-  "%","public.col01_properties.json"　
+  "%","public.col01_properties.json"  
   "$","public.col01"
   "name02","false","2","@BYTE_ARRAY:public.col01_0_3.byte_array"
   ```
