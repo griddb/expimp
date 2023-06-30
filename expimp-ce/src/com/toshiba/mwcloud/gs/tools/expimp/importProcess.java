@@ -20,7 +20,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +58,7 @@ import com.toshiba.mwcloud.gs.tools.common.GridStoreCommandException;
 import com.toshiba.mwcloud.gs.tools.common.data.ExpirationInfo;
 import com.toshiba.mwcloud.gs.tools.common.data.MetaContainerFileIO;
 import com.toshiba.mwcloud.gs.tools.common.data.TablePartitionProperty;
+import com.toshiba.mwcloud.gs.tools.common.data.TimeIntervalInfo;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants.RowFileType;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolContainerInfo;
@@ -255,17 +259,31 @@ public class importProcess {
 			if ( nThreads > 1 ){
 				// Parallel processing
 
-				if ( nThreads > map.values().size() ){
-					nThreads = map.values().size();
-				}
+
 
 				ImportThread[] threadList = new ImportThread[nThreads];
 				int n = 0;
+				
+				// 並列数分のリスト作成
+				List<List<GSEIContInfo>> listGCIs = new ArrayList<List<GSEIContInfo>>();
+				for ( int i = 0; i < nThreads; i++ ){
+					listGCIs.add(new ArrayList<GSEIContInfo>());
+				}
+				// 並列数分にimport対象コンテナを振り分け
 				for ( List<GSEIContInfo> list : map.values() ){
-					threadList[n] = new ImportThread(n, comLineInfo);
-					threadList[n].setContainerList(list, skipDbList);
+					List<GSEIContInfo> tmp = new ArrayList<GSEIContInfo>(listGCIs.get(n%nThreads));
+					tmp.addAll(list);
+					listGCIs.set(n%nThreads, tmp);
 					n++;
 				}
+				int nt = 0;
+				// 並列数分のスレッド生成
+				for ( List<GSEIContInfo> list : listGCIs ){
+					threadList[nt] = new ImportThread(nt, comLineInfo);
+					threadList[nt].setContainerList(list, skipDbList);
+					nt++;
+				}
+				
 				for ( int i = 0; i < nThreads; i++ ){
 					threadList[i].start();
 				}
@@ -903,6 +921,11 @@ public class importProcess {
 					// Raw file read object (Since the file output type csv / binray is required,
 					// it is executed at this timing when the metafile is read)
 					m_fileIO = GSEIFileIOFactory.createFileIO(contInfo.getContainerFileType(), comLineInfo);
+					// (V5.2)SimpleDateFormatのフォーマットを変更したため、下位互換を持たせる
+					if ((contInfo.getContainerFileType().equals(RowFileType.CSV) || contInfo.getContainerFileType().equals(RowFileType.ARCHIVE_CSV)) 
+							&& contInfo.getVersion().compareTo(GSConstants.EXPORT_MNG_FILE_VERSION_3) < 0) {
+						m_fileIO.changeDateFormat();
+					}
 				}
 
 				containerName = contInfo.getFullName();
@@ -962,13 +985,6 @@ public class importProcess {
 				// Indexing
 				// ---------------------------
 				createIndex(conn, store, cInfo, contInfo, targetContainer);
-
-				// ---------------------------
-				// Trigger creation
-				// ---------------------------
-				for ( TriggerInfo trigger : contInfo.getTriggerInfoList() ){
-					targetContainer.createTrigger(trigger);
-				}
 
 				// success
 				long endTime = System.currentTimeMillis();
@@ -1054,42 +1070,131 @@ public class importProcess {
 		int rowIndex = 0;
 		int addRowCount = 0;
 
+		Calendar cal = Calendar.getInstance();
+		SimpleDateFormat sdf = new SimpleDateFormat(GSConstants.DATE_FORMAT_NOT_TIMEZONE);
+		final int INTERVAL_UNIT = Calendar.DATE;
+		final int INTERVAL_VALUE = 1;
+		List<String> containerFileList = new ArrayList<String>();
+
 		try {
-			if ( contInfo.getContainerFileList() == null ){
-				return 0;
+			// メタデータファイルにtimeIntervalInfoオブジェクトがあり　かつ　--intervalsが指定された場合
+			if ( contInfo.getTimeIntervalInfos() != null && contInfo.getTimeIntervalInfos().size() > 0
+					&& comLineInfo.getIntervals() != null && comLineInfo.getIntervals().length > 1) {
+				List<String> contFileList = new ArrayList<String>();// import対象のファイル一覧
+				Date intervalFrom = comLineInfo.getIntervals()[0];// --intervals 始点
+				Date intervalTo = comLineInfo.getIntervals()[1];// --intervals 終点
+				for (TimeIntervalInfo timeIntervalInfo : contInfo.getTimeIntervalInfos()) {
+					Date from = sdf.parse(timeIntervalInfo.getBoundaryValue());
+					cal.setTime(from);
+					cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+					Date to = cal.getTime();
+					// import対象ファイルの期間の終点 < --intervalsの始点　importしない
+					if (to.getTime() < intervalFrom.getTime()) {
+						//何もしない intervalsの条件と一致しない						
+					}
+					// import対象ファイルの期間の始点 > --intervalsの終点　importしない
+					else if (from.getTime() > intervalTo.getTime()) {
+						//何もしない intervalsの条件と一致しない
+					} 
+					else {
+						// import対象のロウデータファイルとして追加する
+						contFileList.add(timeIntervalInfo.getContainerFile());
+					}
+				}
+				
+				// intervalsの条件と一致するロウデータファイルが存在しなかった
+				if (contFileList == null || contFileList.size() == 0) {
+					String warnMsg = messageResource.getString("MESS_IMPORT_PROC_IMPORTPROC_5") 
+							+ comLineInfo.getIntervals()[0] + " - " + comLineInfo.getIntervals()[1];
+					comLineInfo.sysoutString(warnMsg);
+					log.warn(warnMsg);
+				}
+				
+				// 読み込み対象のファイル一覧設定
+				containerFileList = contFileList;
+			} else {
+				// 既存の処理
+				if ( contInfo.getContainerFileList() == null ){
+					return 0;
+				}
+				// 読み込み対象のファイル一覧設定
+				containerFileList = contInfo.getContainerFileList();
 			}
 
-			// Start reading raw file
-			m_fileIO.readContainer(contInfo, contInfo.getContainerFileList());
+			if (contInfo.getContainerFileType().equals(RowFileType.CSV) || 
+					contInfo.getContainerFileType().equals(RowFileType.ARCHIVE_CSV)) {
+				// csv形式は元々1ロウデータファイルのみだったため、複数ロウデータファイルに対応
+				for (String containerFile:containerFileList) {
+					List<String> containerFiles = new ArrayList<String>();
+					containerFiles.add(containerFile);
+				
+					// ロウファイル読み込み開始
+					m_fileIO.readContainer(contInfo, containerFiles);
+					
+					// ROWの読み込みと登録
+					int commitCount = comLineInfo.getCommitCount();
+					List<Row> rowList = new ArrayList<Row>(commitCount);
+					while(m_fileIO.hasNextRow()){
+						rowIndex++;
+						if ( firstIndex > (rowIndex-1) ) continue;
+						if ( (lastIndex!=-1) && lastIndex < rowIndex ) {
+							rowIndex--;
+							break;
+						}
 
-			// ROW loading and registration
-			int commitCount = comLineInfo.getCommitCount();
-			List<Row> rowList = new ArrayList<Row>(commitCount);
-			while(m_fileIO.hasNextRow()){
-				rowIndex++;
-				if ( firstIndex > (rowIndex-1) ) continue;
-				if ( (lastIndex!=-1) && lastIndex < rowIndex ) {
-					rowIndex--;
-					break;
+						Row row = m_fileIO.readRow(container);
+						rowList.add(row);
+						addRowCount++;
+
+						if ( ((rowIndex) % commitCount) == 0 ){
+							startMultiPut = System.currentTimeMillis();
+							container.put(rowList);
+							endMultiPut = System.currentTimeMillis();
+							m_timePut += (endMultiPut - startMultiPut);
+							rowList = new ArrayList<Row>(commitCount);
+						}
+					}
+					if ( rowList.size() > 0 ){
+						startMultiPut = System.currentTimeMillis();
+						container.put(rowList);
+						endMultiPut = System.currentTimeMillis();
+						m_timePut += (endMultiPut - startMultiPut);
+					}
+			
 				}
+			} else {
+				// ロウファイル読み込み開始
+				m_fileIO.readContainer(contInfo, containerFileList);
 
-				Row row = m_fileIO.readRow(container);
-				rowList.add(row);
-				addRowCount++;
+				// ROWの読み込みと登録
+				int commitCount = comLineInfo.getCommitCount();
+				List<Row> rowList = new ArrayList<Row>(commitCount);
+				while(m_fileIO.hasNextRow()){
+					rowIndex++;
+					if ( firstIndex > (rowIndex-1) ) continue;
+					if ( (lastIndex!=-1) && lastIndex < rowIndex ) {
+						rowIndex--;
+						break;
+					}
 
-				if ( ((rowIndex) % commitCount) == 0 ){
+					Row row = m_fileIO.readRow(container);
+					rowList.add(row);
+					addRowCount++;
+
+					if ( ((rowIndex) % commitCount) == 0 ){
+						startMultiPut = System.currentTimeMillis();
+						container.put(rowList);
+						endMultiPut = System.currentTimeMillis();
+						m_timePut += (endMultiPut - startMultiPut);
+						rowList = new ArrayList<Row>(commitCount);
+					}
+				}
+				if ( rowList.size() > 0 ){
 					startMultiPut = System.currentTimeMillis();
 					container.put(rowList);
 					endMultiPut = System.currentTimeMillis();
 					m_timePut += (endMultiPut - startMultiPut);
-					rowList = new ArrayList<Row>(commitCount);
 				}
-			}
-			if ( rowList.size() > 0 ){
-				startMultiPut = System.currentTimeMillis();
-				container.put(rowList);
-				endMultiPut = System.currentTimeMillis();
-				m_timePut += (endMultiPut - startMultiPut);
 			}
 
 			return addRowCount;

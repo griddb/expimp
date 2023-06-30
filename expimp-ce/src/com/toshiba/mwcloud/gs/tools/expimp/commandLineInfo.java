@@ -18,6 +18,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.util.Date;
 import java.util.List;
 
 import com.toshiba.mwcloud.gs.tools.common.NotificationMode;
@@ -170,6 +171,9 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	 */
 	private String authenticationMethod;
 
+	/**
+	 * SSL接続設定    [propertyFile]
+	 */
 	private String sslMode;
 
 	/**
@@ -177,6 +181,11 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	 */
 	private String notificationInterfaceAddress;
 
+	/**
+	 * コマンドintervalsオプションのTimeZone設定　[propertyFile]
+	 */
+	private String m_intervalTimeZoneId = "GMT+09:00";
+	
 	//=====================================================
 	// Setting parameters for Exp/Imp
 	//=====================================================
@@ -300,6 +309,11 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	 */
 	private boolean schema_only_flag;
 
+	/**
+	 * インターバル指定
+	 */
+	private Date[] intervals;
+	
 	private int m_parallelInputCount = -1;
 	private int m_parallelOutputCount = -1;
 
@@ -1157,6 +1171,24 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	}
 
 	/**
+	 * インターバルを設定する。
+	 *
+	 * @param interval
+	 */
+	public void setIntervals(Date[] intervals) {
+		this.intervals = intervals;
+	}
+
+	/**
+	 * インターバルを返す。
+	 *
+	 * @return interval
+	 */
+	public Date[] getIntervals() {
+		return intervals;
+	}
+	
+	/**
 	 * [--parallel] Set the input number of parallel execution
 	 *
 	 * @param count The input number of parallel execution
@@ -1290,6 +1322,23 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	public void setNotificationInterfaceAddress(String notificationInterfaceAddress) {
 		this.notificationInterfaceAddress = notificationInterfaceAddress;
 	}
+
+	/**
+	 * コマンドintervalsオプションのTimeZoneを返す。
+	 * @return
+	 */
+	public String getIntervalTimeZoneId() {
+		return m_intervalTimeZoneId;
+	}
+	
+	/**
+	 * コマンドintervalsオプションのTimeZoneを設定する。
+	 * @param intervalTimeZoneId
+	 */
+	public void setIntervalTimeZoneId(String intervalTimeZoneId) {
+		m_intervalTimeZoneId = intervalTimeZoneId;
+	}
+
 
 	/**
 	 * Detailed log display output (when --verbose is set)

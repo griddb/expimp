@@ -135,6 +135,9 @@ public class rowDataFileIO extends GSEIFileIO{
 		m_entryNum = 0;
 	}
 
+	// バイナリはSimpleDateFormatを使わないので、処理はなし
+	public void changeDateFormat() {
+	}
 
 	/**
 	 * Returns the entry name of the Zip file.
@@ -283,9 +286,12 @@ public class rowDataFileIO extends GSEIFileIO{
 		if (cmdLineInfo.getSchemaOnlyFlag()) return;
 
 		try {
-			// Save the raw file name
-			m_containerInfo.addContainerFile(createRowFileName());
-
+			// ロウファイル名を保存する
+			// 生成していないロウデータファイル名を追記しない
+			if (m_containerInfo.getContainerFile() == null || !m_containerInfo.getContainerFileList().contains(m_file.getName())) {
+				m_containerInfo.addContainerFile(m_file.getName());//rowCsvFileIOと同じ処理に変更
+			}
+			
 			switch(m_outputMode){
 			case SINGLE:
 				// Close zip file

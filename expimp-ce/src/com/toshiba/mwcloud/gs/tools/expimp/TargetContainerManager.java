@@ -16,6 +16,7 @@ package com.toshiba.mwcloud.gs.tools.expimp;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,6 +75,9 @@ public class TargetContainerManager {
 	/** Container list  ( Node name - DbPartition[Database name, partition ID, container group] ) */
 	private Map<String, List<DbPartition>> m_containerMap;
 
+	/** タイムインターバルコンテナリスト  ( ノード名 - DbPartition[データベース名、パーティションID、コンテナ群] ) */
+	private Map<String, List<DbPartition>> m_timeintervalcontainerMap;
+
 	/** Assigning nodes per thread  ( Thread ID-node name ) */
 	private Map<Long, String> m_threadAssignmentMap;
 
@@ -86,6 +90,11 @@ public class TargetContainerManager {
 	 */
 	private Map<String, Iterator<DbPartition>> m_progressMap;
 
+	/** 処理の進捗を示すIteratorリスト ( ノード名 - DbPartitionのIterator )
+	 *   (m_timeintervalcontainerMapの中で、どのDbPartitionまで処理が進んだかを示す。
+	 *    nullの場合は、そのノードのコンテナに対する処理は完了済み）
+	 */
+	private Map<String, Iterator<DbPartition>> m_progressTimeIntervalMap;
 
 	//==============================================
 	//  For Import
@@ -122,8 +131,10 @@ public class TargetContainerManager {
 	public void setThreadNum(int nThreads){
 		m_threadAssignmentMap = new HashMap<Long, String>(nThreads, 1.0F);
 		m_containerMap = null;
+		m_timeintervalcontainerMap = null;
 		m_nodeIterator = null;
 		m_progressMap = null;
+		m_progressTimeIntervalMap = null;
 	}
 
 
@@ -140,6 +151,18 @@ public class TargetContainerManager {
 		m_threadAssignmentMap.put(threadId, node);
 	}
 
+	/**
+	 * スレッドIDを登録します。
+	 *
+	 * @param threadId スレッドID
+	 */
+	public synchronized void registTimeIntervalThread(long threadId){
+		if ( m_nodeIterator == null || !m_nodeIterator.hasNext() ){
+			m_nodeIterator = m_timeintervalcontainerMap.keySet().iterator();
+		}
+		String node = m_nodeIterator.next();
+		m_threadAssignmentMap.put(threadId, node);
+	}
 
 
 	/**
@@ -177,6 +200,40 @@ public class TargetContainerManager {
 		return null;
 	}
 
+	/**
+	 * コンテナリストを返します。
+	 * Export時に、各スレッドから実行されます。
+	 *
+	 * @return
+	 */
+	public DbPartition getTimeIntervalContainerList(){
+		long threadId = Thread.currentThread().getId();
+		String node = m_threadAssignmentMap.get(threadId);
+
+		synchronized (m_timeintervalcontainerMap.get(node)) {
+			Iterator<DbPartition> itr = m_progressTimeIntervalMap.get(node);
+			if ( (itr == null) || !itr.hasNext() ){
+				// 無くなったので次のノードに移る
+				m_progressTimeIntervalMap.put(node, null);
+			} else {
+				return itr.next();
+			}
+		}
+
+		for ( String nodeName : m_progressTimeIntervalMap.keySet() ){
+			synchronized (m_timeintervalcontainerMap.get(nodeName)) {
+				Iterator<DbPartition> itr = m_progressTimeIntervalMap.get(nodeName);
+				if ( (itr == null) || !itr.hasNext() ){
+					// 無くなったので次のノードに移る
+					m_progressTimeIntervalMap.put(nodeName, null);
+				} else {
+					m_threadAssignmentMap.put(threadId, nodeName);
+					return itr.next();
+				}
+			}
+		}
+		return null;
+	}
 
 	/**
 	 * Dump the container list. (For debug)
@@ -211,6 +268,19 @@ public class TargetContainerManager {
 		return count;
 	}
 
+	/**
+	 * タイムインターバルコンテナリストのコンテナ数を返します。
+	 * @return
+	 */
+	public int getTimeIntervalContainerCount(){
+		int count = 0;
+		for (Map.Entry<String, List<DbPartition>> nodeEntry : m_timeintervalcontainerMap.entrySet()){
+			for ( DbPartition dbPartition : nodeEntry.getValue() ){
+				count += dbPartition.getContainerList().size();
+			}
+		}
+		return count;
+	}
 
 	/**
 	 * Select the container to be imported.
@@ -503,13 +573,44 @@ public class TargetContainerManager {
 			// (2) Obtaining the target container name from each database
 			//----------------------------------------------------------------
 			m_containerMap = new HashMap<String, List<DbPartition>>();
+			m_timeintervalcontainerMap = new HashMap<String, List<DbPartition>>();
 			Set<String> containerMap = new HashSet<String>();// A set of container names for duplicate checking
+
+			Connection conn = null;
+			Set<String> intervalPartitionTables = new HashSet<String>();
+			Set<String> intervalPartitionNotTimestampTables = new HashSet<String>();
+			Set<String> hashPartitionNotTimestampTables = new HashSet<String>();
+			Set<String> timeseriesContainers = new HashSet<String>();
+			Set<String> timeIntervalContainers = new HashSet<String>();
+
 
 			// If a container name is specified, search by container name
 			if ( operationInfo.getTargetType()==TARGET_TYPE.CONTAINER_NAME ){
 				if ( operationInfo.getContainerNameList() != null ){
 					String dbName = dbNameList==null? ToolConstants.PUBLIC_DB: dbNameList.get(0);
 					GridStore gstore = gridStoreServerIO.getConnection(operationInfo, dbName);
+					
+					// filterfileオプションが設定されている場合は日付ごとの分割は行わない
+					// schemaOnlyオプションが設定されている場合は日付ごとの分割は行わない
+					if (!operationInfo.getFilterfileFlag() && !operationInfo.getSchemaOnlyFlag()) {
+						conn = gridStoreServerIO.getJdbcConnection(operationInfo, dbName);
+
+						intervalPartitionTables = gridStoreServerIO.getIntervalPartitionTableNames(conn);// インターバルパーティションテーブル取得　パーティショニングキーがTimestamp型
+						// 一旦TimeSeriesコンテナを一式取得して、対象外のコンテナについては以降で除外する
+						timeseriesContainers = gridStoreServerIO.getTimeSeriesContainerNames(conn);// TimeSeries取得
+					
+						// 対象TimeSeriesコンテナからインターバルパーティショニング　パーティショニングキーがTimestamp型以外を除外する
+						intervalPartitionNotTimestampTables = gridStoreServerIO.getIntervalPartitionTableNotTimestampNames(conn);// インターバルパーティショニング取得　パーティショニングキーがTimestamp型以外
+						timeseriesContainers.removeAll(intervalPartitionNotTimestampTables);
+					
+						// 対象TimeSeriesコンテナからハッシュパーティショニングテーブルを除外する
+						hashPartitionNotTimestampTables = gridStoreServerIO.getHashParitionTableNotTimestampNames(conn);// ハッシュパーティショニング取得
+						timeseriesContainers.removeAll(hashPartitionNotTimestampTables);
+					
+						timeIntervalContainers = new HashSet<String>(intervalPartitionTables);
+						timeIntervalContainers.addAll(timeseriesContainers);//タイムインターバルコンテナリスト
+					}
+					
 					PartitionController controller = gstore.getPartitionController();
 
 					for ( String contName : operationInfo.getContainerNameList()){
@@ -519,8 +620,13 @@ public class TargetContainerManager {
 							throw new GSEIException(messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_12")+" db=["+dbName+"] container=["+contName+"]");
 						}
 						if ( !containerMap.contains(contInfo.getName()) ){
-							int i = controller.getPartitionIndexOfContainer(contInfo.getName());
-							setContainerList(contInfo.getName(), operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);
+							if ( !timeIntervalContainers.contains(contInfo.getName())) {//通常のコンテナ
+								int i = controller.getPartitionIndexOfContainer(contInfo.getName());
+								setContainerList(contInfo.getName(), operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);
+							} else {//タイムインターバルコンテナ
+								int i = controller.getPartitionIndexOfContainer(contInfo.getName());
+								setTimeIntervalContainerList(contInfo.getName(), operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);								
+							}
 							containerMap.add(contInfo.getName());
 						}
 					}
@@ -536,6 +642,28 @@ public class TargetContainerManager {
 
 				for ( String dbName : dbNameList ){
 					GridStore gstore = gridStoreServerIO.getConnection(operationInfo, dbName);
+					
+					// filterfileオプションが設定されている場合は日付ごとの分割は行わない
+					// schemaOnlyオプションが設定されている場合は日付ごとの分割は行わない
+					if (!operationInfo.getFilterfileFlag() && !operationInfo.getSchemaOnlyFlag()) {
+						conn = gridStoreServerIO.getJdbcConnection(operationInfo, dbName);
+
+						intervalPartitionTables = gridStoreServerIO.getIntervalPartitionTableNames(conn);// インターバルパーティションテーブル取得　パーティショニングキーがTimestamp型
+						// 一旦TimeSeriesコンテナを一式取得して、対象外のコンテナについては以降で除外する
+						timeseriesContainers = gridStoreServerIO.getTimeSeriesContainerNames(conn);// TimeSeries取得
+					
+						// 対象TimeSeriesコンテナからインターバルパーティショニング　パーティショニングキーがTimestamp型以外を除外する
+						intervalPartitionNotTimestampTables = gridStoreServerIO.getIntervalPartitionTableNotTimestampNames(conn);// インターバルパーティショニング取得　パーティショニングキーがTimestamp型以外
+						timeseriesContainers.removeAll(intervalPartitionNotTimestampTables);
+
+						// 対象TimeSeriesコンテナからハッシュパーティショニングテーブルを除外する
+						hashPartitionNotTimestampTables = gridStoreServerIO.getHashParitionTableNotTimestampNames(conn);// ハッシュパーティショニング取得
+						timeseriesContainers.removeAll(hashPartitionNotTimestampTables);
+
+						timeIntervalContainers = new HashSet<String>(intervalPartitionTables);
+						timeIntervalContainers.addAll(timeseriesContainers);//タイムインターバルコンテナリスト
+					}
+					
 					PartitionController controller = gstore.getPartitionController();
 					int partitionCount = controller.getPartitionCount();
 
@@ -552,7 +680,15 @@ public class TargetContainerManager {
 								containerNames = checkRegexContainer(operationInfo, containerNames, containerMap);
 							}
 							if ( containerNames.size() > 0 ){
-								setContainerList(containerNames, operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);
+								List<String> timeIntervalContainerNameList = new ArrayList<String>(timeIntervalContainers);
+								timeIntervalContainerNameList.retainAll(containerNames);//積集合(export対象のコンテナかつタイムインターバルコンテナ)
+								containerNames.removeAll(timeIntervalContainerNameList);//補集合(export対象でインターバルコンテナ以外)
+								if (containerNames.size() > 0) {
+									setContainerList(containerNames, operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);
+								}
+								if (timeIntervalContainerNameList.size() > 0) {
+									setTimeIntervalContainerList(timeIntervalContainerNameList, operationInfo.getParallelCount()>1?controller.getOwnerHost(i).toString():"AllNode", dbName, i);
+								}
 							}
 
 						} catch ( GSException e ){
@@ -573,14 +709,20 @@ public class TargetContainerManager {
 				}
 			}
 
-			if ( getContainerCount() == 0 ){
+			if ( getContainerCount() == 0 && getTimeIntervalContainerCount() == 0 ){
 				// The corresponding container does not exist for export.
 				throw new GSEIException(messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_18"));
 			}
 
 			m_progressMap = new HashMap<String, Iterator<DbPartition>>(m_containerMap.size(), 1.0F);
+			m_progressTimeIntervalMap = new HashMap<String, Iterator<DbPartition>>(m_timeintervalcontainerMap.size(), 1.0F);//インターバルコンテナ
+
 			for ( Map.Entry<String, List<DbPartition>> entry : m_containerMap.entrySet() ){
 				m_progressMap.put(entry.getKey(), entry.getValue().iterator());
+			}
+
+			for ( Map.Entry<String, List<DbPartition>> entry : m_timeintervalcontainerMap.entrySet() ){
+				m_progressTimeIntervalMap.put(entry.getKey(), entry.getValue().iterator());
 			}
 
 		} catch (GSTimeoutException e){
@@ -623,6 +765,33 @@ public class TargetContainerManager {
 		List<String> contList = new ArrayList<String>();
 		contList.add(contName);
 		setContainerList(contList, addressStr, dbName, partitionNo);
+	}
+
+	private void setTimeIntervalContainerList(List<String> contList, String addressStr, String dbName, int partitionNo){
+		// [memo]ポート番号まで取得できない。同じマシン上に複数GridStoreノードは通常運用では有り得ないので問題ない。
+		
+		// Map<String, List<DBPartition>> m_intervalcontainerMap  ノードアドレス - List<DBパーティション情報(DB名、パーティションID、コンテナ群)>
+		List<DbPartition> dbList = m_timeintervalcontainerMap.get(addressStr);
+		if ( dbList == null ){
+			dbList = new ArrayList<DbPartition>();
+			m_timeintervalcontainerMap.put(addressStr, dbList);
+		}
+
+		DbPartition dbPartition = new DbPartition(dbName, partitionNo, contList);
+		int idx = dbList.indexOf(dbPartition);
+		if ( idx > -1 ){
+			DbPartition part = dbList.get(idx);
+			part.addContainerList(contList);
+
+		} else {
+			dbList.add(dbPartition);
+		}
+	}
+
+	private void setTimeIntervalContainerList(String contName, String addressStr, String dbName, int partitionNo ){
+		List<String> contList = new ArrayList<String>();
+		contList.add(contName);
+		setTimeIntervalContainerList(contList, addressStr, dbName, partitionNo);
 	}
 
 	/**

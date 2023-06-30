@@ -111,6 +111,13 @@ public class exportMain {
 			if (!silent) System.out.println(errMsg);
 			log.error(errMsg, error);
 			status = false;
+		} catch (Error error) {
+			if (!silent) {
+				// An error occurred during the export process
+				System.out.println(messageResource.getString("MESS_EXPORT_ERR_EXPORTMAIN_4"));
+			}
+			log.error(messageResource.getString("MESS_EXPORT_ERR_EXPORTMAIN_4"), error);
+			status = false;
 		}
 
 		if ( status ){

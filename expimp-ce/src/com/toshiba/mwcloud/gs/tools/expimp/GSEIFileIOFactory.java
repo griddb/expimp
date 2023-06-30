@@ -27,9 +27,6 @@ public class GSEIFileIOFactory {
 		case BINARY:
 			rowFile = new rowDataFileIO(comLineInfo);
 			break;
-		case AVRO:
-			rowFile = new rowAvroFileIO(comLineInfo);
-			break;
 		case ARCHIVE_CSV:
 			// ARCHIVE_CSV returns the same rowCsvFileIO as CSV
 			rowFile = new rowCsvFileIO(comLineInfo);
