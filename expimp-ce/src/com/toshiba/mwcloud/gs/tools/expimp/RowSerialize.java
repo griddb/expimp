@@ -13,11 +13,13 @@
 
 package com.toshiba.mwcloud.gs.tools.expimp;
 
+import com.toshiba.mwcloud.gs.ColumnInfo;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.sql.Blob;
+import java.sql.Timestamp;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,6 +30,8 @@ import javax.sql.rowset.serial.SerialBlob;
 import com.toshiba.mwcloud.gs.GSType;
 import com.toshiba.mwcloud.gs.Geometry;
 import com.toshiba.mwcloud.gs.Row;
+import com.toshiba.mwcloud.gs.TimeUnit;
+import com.toshiba.mwcloud.gs.tools.common.data.MetaContainerFileIO;
 
 /**
  * This is a class for serialization when inputting / outputting a binary format file.
@@ -234,7 +238,15 @@ public class RowSerialize implements Externalizable {
 				out.writeDouble(row.getDouble(index));
 				break;
 			case TIMESTAMP:
-				out.writeObject(row.getTimestamp(index));
+				Object timestamp = null;
+				ColumnInfo columnInfo = row.getSchema().getColumnInfo(index);
+				if (MetaContainerFileIO.isPreciseColumn(columnInfo)) {
+					timestamp = row.getPreciseTimestamp(index);
+				}
+				else {
+					timestamp = row.getTimestamp(index);
+				}
+				out.writeObject(timestamp);
 				break;
 			case GEOMETRY:
 				out.writeObject((row.getGeometry(index)).toString());	// GEOMETRY outputs as String
@@ -314,7 +326,13 @@ public class RowSerialize implements Externalizable {
 					row.setDouble(index, in.readDouble());
 					break;
 				case TIMESTAMP:
-					row.setTimestamp(index, (Date)in.readObject());
+					ColumnInfo columnInfo = row.getSchema().getColumnInfo(index);
+					if (MetaContainerFileIO.isPreciseColumn(columnInfo)) {
+						row.setPreciseTimestamp(index, (Timestamp)in.readObject());
+					}
+					else {
+						row.setTimestamp(index, (Date)in.readObject());
+					}
 					break;
 				case GEOMETRY:
 					row.setGeometry(index, Geometry.valueOf((String)in.readObject()));	// GEOMETRY outputs as String
@@ -495,7 +513,15 @@ public class RowSerialize implements Externalizable {
 				out.writeDouble(row.getDouble(index));
 				break;
 			case TIMESTAMP:
-				out.writeObject(row.getTimestamp(index));
+				Object timestamp = null;
+				ColumnInfo columnInfo = row.getSchema().getColumnInfo(index);
+				if (MetaContainerFileIO.isPreciseColumn(columnInfo)) {
+					timestamp = row.getPreciseTimestamp(index);
+				}
+				else {
+					timestamp = row.getTimestamp(index);
+				}
+				out.writeObject(timestamp);
 				break;
 			case GEOMETRY:
 				out.writeObject((row.getGeometry(index)).toString());	// GEOMETRYはStringで出力する
@@ -581,7 +607,12 @@ public class RowSerialize implements Externalizable {
 					row.setDouble(index, in.readDouble());
 					break;
 				case TIMESTAMP:
-					row.setTimestamp(index, (Date)in.readObject());
+					ColumnInfo columnInfo = row.getSchema().getColumnInfo(index);
+					if (MetaContainerFileIO.isPreciseColumn(columnInfo)) {
+						row.setPreciseTimestamp(index, (Timestamp)in.readObject());
+					} else {
+						row.setTimestamp(index, (Date)in.readObject());
+					}
 					break;
 				case GEOMETRY:
 					row.setGeometry(index, Geometry.valueOf((String)in.readObject()));	// GEOMETRY outputs as String
@@ -665,7 +696,12 @@ public class RowSerialize implements Externalizable {
 					rowDataList.add(in.readDouble());
 					break;
 				case TIMESTAMP:
-					rowDataList.add((Date)in.readObject());
+					Object object = in.readObject();
+					if (object instanceof Timestamp) {
+						rowDataList.add(index, (Timestamp) object);
+					} else {
+						rowDataList.add(index, (Date) object);
+					}
 					break;
 				case GEOMETRY:
 					rowDataList.add(Geometry.valueOf((String)in.readObject()));	// GEOMETRY outputs as String

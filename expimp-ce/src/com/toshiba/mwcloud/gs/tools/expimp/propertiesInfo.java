@@ -17,10 +17,12 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ResourceBundle;
+import java.util.TimeZone;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +79,7 @@ public class propertiesInfo {
 	public void loadConfig(commandLineInfo ci) throws Exception {
 
 		InputStream inputStream = null;
+		SimpleDateFormat sdf = new SimpleDateFormat(GSConstants.DATE_INTERVAL_FORMAT);//インターバルのデータフォーマット
 		try {
 			configuration = new Properties();
 			messageResource = Utility.getResource();
@@ -296,21 +299,48 @@ public class propertiesInfo {
 					ci.setAuthenticationMethod(authenticationMethod);
 				}
 
+				// SSL接続設定
 				String sslMode = configuration.getProperty(GSConstants.PROP_SSL_MODE);
 				if (sslMode != null) {
+					// V4.6 プロパティファイルの設定値がREQUIREDの場合、DB接続時に指定するsslModeの設定はPREFERREDにする
+					if (sslMode.equals(GSConstants.PROP_VALUE_SSL_MODE_REQUIRED)) {
+						sslMode = GSConstants.PROP_VALUE_SSL_MODE_PREFERRED;
+					}
+					// SSL接続設定の設定値が不正値の場合エラー
 					try {
 						SslMode.valueOf(sslMode);
 					} catch (IllegalArgumentException e) {
 						throw new GSEIException(messageResource.getString("MESS_COMM_ERR_PROPINFO_1")+" ('sslMode' is invalid.)");
 					}
 					ci.setSslMode(sslMode);
+				} else {
+					// V4.6 デフォルト値はDISABLED
+					/* CE version: 145005:JC_ILLEGAL_PROPERTY_ENTRY] Unacceptable property specified because of lack of extra library (key=sslMode) */
+					//ci.setSslMode(GSConstants.PROP_VALUE_SSL_MODE_DISABLED);
 				}
 
+				// 複数NIC I/F指定対応
 				String notificationInterfaceAddress = configuration.getProperty(GSConstants.PROP_NOTIFICATION_INTERFACE_ADDRESS);
 				if (notificationInterfaceAddress != null) {
 					ci.setNotificationInterfaceAddress(notificationInterfaceAddress);
 				}
 
+				// Interval TimeZone設定
+				String intervalTimeZoneId = configuration.getProperty(GSConstants.PROP_INTERVAL_TIMEZONE);
+				if (intervalTimeZoneId != null && intervalTimeZoneId.length() > 0) {
+					String timeZoneId = intervalTimeZoneId;
+					// TimeZoneのバリデーション
+					if (!timeZoneId.equals(TimeZone.getTimeZone(timeZoneId).getID())) {
+						throw new GSEIException(messageResource.getString("MESS_COMM_ERR_CMD_57")+ ":[" + intervalTimeZoneId + "]");// "プロパティ[intervalTimeZone]の値が不正です (タイムゾーン名またはGMT+HH:mm形式で指定してください)"						
+					}
+					try {
+						// TimeZoneのバリデーション
+						sdf.setTimeZone(TimeZone.getTimeZone(timeZoneId));
+					} catch (Exception e) {
+						throw new GSEIException(messageResource.getString("MESS_COMM_ERR_CMD_57")+ ":[" + intervalTimeZoneId + "]", e);// "プロパティ[intervalTimeZone]の値が不正です (タイムゾーン名またはGMT+HH:mm形式で指定してください)"
+					}
+					ci.setIntervalTimeZoneId(timeZoneId);
+				}				
 			}
 
 			String msg = "Property :";
@@ -376,6 +406,7 @@ public class propertiesInfo {
 			configuration.setProperty("transactionTimeout",Integer.toString(ci.getTransactionTimeout()));
 			configuration.setProperty("failoverTimeout",Integer.toString(ci.getFailoverTimeout()));
 			configuration.setProperty("jdbcLoginTimeout",Integer.toString(ci.getJdbcLoginTimeout()));
+			configuration.setProperty("intervalTimeZone", ci.getIntervalTimeZoneId());
 
 			configuration.store(outputStream, "propertiesInfo constructer");
 			outputStream.flush();

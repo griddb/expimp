@@ -45,11 +45,13 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_1", "D00101: インポート処理でエラーが発生しました" },//
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_2", "D00102: クライアントAPI(gridstore.jar)のバージョンが古い可能性があります"},
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_3", "D00103: 必要なクラスが見つかりません"},
+			{ "MESS_IMPORT_ERR_IMPORTMAIN_4", "D00104: インポート処理でエラーが発生しました"},
 
 			{ "MESS_IMPORT_PROC_IMPORTPROC_1", "次のコンテナを処理します" },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_2", "コンテナ[" },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_3", "]のインポートに成功しました" },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_4", "]のインポートに失敗しました" },//
+			{ "MESS_IMPORT_PROC_IMPORTPROC_5", "intervalsで指定した条件のロウデータは存在しませんでした  : " },
 
 			{ "MESS_IMPORT_ERR_IMPORTPROC_1", "D00201: コンテナ名の取得処理でエラーが発生しました" },//
 			{ "MESS_IMPORT_ERR_IMPORTPROC_2", "D00202: 指定されたディレクトリにファイルがありません" },//
@@ -132,6 +134,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_1", "D00401: エクスポート処理でエラーが発生しました" },
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_2", "D00402: クライアントAPI(gridstore.jar)のバージョンが古い可能性があります"},
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_3", "D00403: 必要なクラスが見つかりません"},
+			{ "MESS_EXPORT_ERR_EXPORTMAIN_4", "D00404: エクスポート処理でエラーが発生しました"},
 
 			{ "MESS_EXPORT_PROC_EXPORTPROC_1", "サーバに接続しました" },//
 			{ "MESS_EXPORT_PROC_EXPORTPROC_2", "GridDBからコンテナ名一覧を取得しました" },//
@@ -159,6 +162,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_EXPORT_PROC_EXPORTPROC_22", "データベース数  : " },
 			{ "MESS_EXPORT_PROC_EXPORTPROC_23", "対象コンテナ数  : %d  スキップ数  : %d" },
 			{ "MESS_EXPORT_PROC_EXPORTPROC_24", "対象ビュー数  : %d" },
+			{ "MESS_EXPORT_PROC_EXPORTPROC_25", "intervalsで指定した条件のロウデータは存在しませんでした  : "},
 
 			{ "MESS_EXPORT_ERR_EXPORTPROC_1", "D00501: サーバーへの接続が失敗しました" },//
 			{ "MESS_EXPORT_ERR_EXPORTPROC_2", "D00502: コンテナ名一覧がGridDBから取得できません" },//
@@ -402,6 +406,10 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_50", "D00A50: [--parallel]の値が不正です (1以上16以下の整数を指定してください)" },//
 			{ "MESS_COMM_ERR_CMD_51", "D00A51: プロパティ[load.input.threadNum],[load.output.threadNum]は両方指定してください" },//
 			{ "MESS_COMM_ERR_CMD_54", "D00A54: [--out]オプションに指定できる値は20文字までです。" },
+			{ "MESS_COMM_ERR_CMD_55", "D00A55: [--intervals]の値が不正です(yyyyMMdd:yyyyMMdd形式で指定してください)" },//
+			{ "MESS_COMM_ERR_CMD_56", "D00A56: [--intervals]の値が不正です(yyyyMMdd（始点）:yyyyMMdd（終点）形式で指定して、始点 < 終点となるように指定してください)" },//
+			{ "MESS_COMM_ERR_CMD_57", "D00A57: プロパティ[intervalTimeZone]の値が不正です (タイムゾーン名またはGMT+HH:mm形式で指定してください)" },//
+			{ "MESS_COMM_ERR_CMD_58", "D00A58: [--intervals]と[--filterfile]は同時に設定できません" },//
 
 			{ "MESS_COMM_PROC_PROCINFO_1", "処理されないコンテナ名が検出されました" },//
 			{ "MESS_COMM_PROC_PROCINFO_2", "(%d/%d)コンテナ　%s　のインポートに%sしました。（%s）" },//
@@ -423,20 +431,6 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_LOAD_ERR_OUTPUT_0", "D00F00: 登録処理スレッド内でエラーが発生しました。"},
 
 
-			{ "MESS_COMM_ERR_ROWAVRO_1",	"D01501: Avroファイル読み込みでエラーが発生しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_2",	"D01502: Avroファイル読み込みでエラーが発生しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_3",	"D01503: Avroファイル読み込みでエラーが発生しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_4",	"D01504: Avroファイル読み込みでエラーが発生しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_5",	"D01505: GridDBへのロウデータの設定処理でエラーが発生しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_6",	"D01506: 本バージョンでは処理できないデータタイプが検出されました"},
-			{ "MESS_COMM_ERR_ROWAVRO_7",	"D01507: データベース名が一致しないロウデータファイルを検出しました。メタファイルとAvroファイルのスキーマチェックでデータベース名が一致しません。"},
-			{ "MESS_COMM_ERR_ROWAVRO_8",	"D01508: コンテナ名が一致しないロウデータファイルを検出しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_9",	"D01509: カラム数が一致しないロウデータファイルを検出しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_10",	"D01510: カラム名が一致しないロウデータファイルを検出しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_11",	"D01511: Avroファイルよりデータ型の情報が取得できませんでした"},
-			{ "MESS_COMM_ERR_ROWAVRO_12",	"D01512: データ型が一致しないロウデータファイルを検出しました"},
-			{ "MESS_COMM_ERR_ROWAVRO_13",	"D01513: NotNull制約が一致しないロウデータファイルを検出しました"},
-
 			{
 					"MESS_EXPORT_HELP_1",
 					"gs_export --user username/password [--password password]"
@@ -448,6 +442,8 @@ public class messageResource_ja extends ListResourceBundle {
 							+ "[--out [filename]][--binary [fileSizeLimit]]"
 							+ System.getProperty("line.separator")
 							+ /*"[--count maxFetchCount]*/"[--filterfile filename]"
+							+ System.getProperty("line.separator")
+							+ "[--intervals YYYYMMdd:YYYYMMdd]"
 							+ System.getProperty("line.separator")
 							+ "[--test][--force]"
 							+ System.getProperty("line.separator")
@@ -468,6 +464,8 @@ public class messageResource_ja extends ListResourceBundle {
 							+ "[--file filename...]"
 							+ System.getProperty("line.separator")
 							+ "[--append | --replace][--count maxCommitCount]"
+							+ System.getProperty("line.separator")
+							+ "[--intervals YYYYMMdd:YYYYMMdd]"
 							+ System.getProperty("line.separator")
 							+ "[--force]"
 							+ System.getProperty("line.separator")

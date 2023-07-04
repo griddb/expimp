@@ -20,7 +20,7 @@ import java.util.ListResourceBundle;
  */
 public class messageResource extends ListResourceBundle {
 
-	public static final String VERSION_NUM = "4.6.00";
+	public static final String VERSION_NUM = "5.3.00";
 	public static final String VERSION = "V"+VERSION_NUM;
 	public static final String GS_EXPORT_CE = "gs_export-ce";
 	public static final String GS_IMPORT_CE = "gs_import-ce";
@@ -46,11 +46,13 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_1", "D00101: An unexpected error occurred while importing data." },//
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_2", "D00102: The client api (gridstore.jar) version may be older."},
 			{ "MESS_IMPORT_ERR_IMPORTMAIN_3", "D00103: A Required class does not found."},
+			{ "MESS_IMPORT_ERR_IMPORTMAIN_4", "D00104: An unexpected error occurred while importing data."},
 
 			{ "MESS_IMPORT_PROC_IMPORTPROC_1", "The following Container is processed." },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_2", "Container[" },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_3", "] has been imported successfully." },//
 			{ "MESS_IMPORT_PROC_IMPORTPROC_4", "] has been imported unsuccessfully." },//
+			{ "MESS_IMPORT_PROC_IMPORTPROC_5", "The row data did not exist specified intervals : " },
 
 			{ "MESS_IMPORT_ERR_IMPORTPROC_1", "D00201: An unexpected error occurred while getting container names." },//
 			{ "MESS_IMPORT_ERR_IMPORTPROC_2", "D00202: No file exists in that directory path." },//
@@ -133,6 +135,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_1", "D00401: An unexpected error occurred while exporting data." },
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_2", "D00402: The client api (gridstore.jar) version may be older."},
 			{ "MESS_EXPORT_ERR_EXPORTMAIN_3", "D00403: A Required class does not found."},
+			{ "MESS_EXPORT_ERR_EXPORTMAIN_4", "D00404: An unexpected error occurred while exporting data."},
 
 			{ "MESS_EXPORT_PROC_EXPORTPROC_1", "Connected to the GridDB cluster" },//
 			{ "MESS_EXPORT_PROC_EXPORTPROC_2", "The container name list has been acquired." },//
@@ -160,6 +163,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_EXPORT_PROC_EXPORTPROC_22", "Number of databases : " },
 			{ "MESS_EXPORT_PROC_EXPORTPROC_23", "Number of target containers : %d  Number of skip containers : %d" },
 			{ "MESS_EXPORT_PROC_EXPORTPROC_24", "Number of target views : %d" },
+			{ "MESS_EXPORT_PROC_EXPORTPROC_25", "The row data did not exist specified intervals : " },
 
 			{ "MESS_EXPORT_ERR_EXPORTPROC_1", "D00501: Failed to connect to the GridDB cluster." },//
 			{ "MESS_EXPORT_ERR_EXPORTPROC_2", "D00502: The container name list could not be acquired." },//
@@ -403,6 +407,10 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_50", "D00A50: [--parallel] option is invalid. Specify a value between 1-16." },//
 			{ "MESS_COMM_ERR_CMD_51", "D00A51: Both property [load.input.threadNum] and [load.output.threadNum] must be set." },//
 			{ "MESS_COMM_ERR_CMD_54", "D00A54: The max of the length of string that can be specified as [--out] option is 20 characters." },//
+			{ "MESS_COMM_ERR_CMD_55", "D00A55: [--intervals] option is invalid. Specify a value yyyyMMdd:yyyyMMdd format." },//
+			{ "MESS_COMM_ERR_CMD_56", "D00A56: [--intervals] option is invalid. Specify a value yyyyMMdd(from):yyyyMMdd(to) format and specify so that from < to." },//
+			{ "MESS_COMM_ERR_CMD_57", "D00A57: Property [intervalTimeZone] is invalid. Specify TimeZone or GMT+HH:mm format." },//
+			{ "MESS_COMM_ERR_CMD_58", "D00A58: [--intervals] option and [--filterfile] option cannot be set at same time." },//
 
 			{ "MESS_COMM_PROC_PROCINFO_1", "The container name which did not be processed has been detected." },//
 			{ "MESS_COMM_PROC_PROCINFO_2", "(%d/%d)Container %s is imported %s.(%s)" },//
@@ -423,21 +431,6 @@ public class messageResource extends ListResourceBundle {
 
 			{ "MESS_LOAD_ERR_OUTPUT_0", "D00F00: An unexpected error occurred while registering data  "},
 
-
-			{ "MESS_COMM_ERR_ROWAVRO_1",	"D01501: An unexpected error occurred while reading the Avro file."},
-			{ "MESS_COMM_ERR_ROWAVRO_2",	"D01502: An unexpected error occurred while reading the Avro file."},
-			{ "MESS_COMM_ERR_ROWAVRO_3",	"D01503: An unexpected error occurred while reading the Avro file."},
-			{ "MESS_COMM_ERR_ROWAVRO_4",	"D01504: An unexpected error occurred while reading the Avro file."},
-			{ "MESS_COMM_ERR_ROWAVRO_5",	"D01505: An unexpected error occurred while setting row data."},
-			{ "MESS_COMM_ERR_ROWAVRO_6",	"D01506: The Data type that cannot be processed in the present version has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_7",	"D01507: The row data file that the database is mismatched has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_8",	"D01508: The row data file that the container name is mismatched has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_9",	"D01509: The row data file that the number of columns is mismatched has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_10",	"D01510: The row data file that the column name is mismatched has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_11",	"D01511: The data type is not found in Avro data file."},
-			{ "MESS_COMM_ERR_ROWAVRO_12",	"D01512: The row data file that the data type is mismatched has been detected."},
-			{ "MESS_COMM_ERR_ROWAVRO_13",	"D01513: The row data file that the not null constraint is mismatched has been detected."},
-
 			{
 					"MESS_EXPORT_HELP_1",
 					"gs_export --user username/password [--password password]"
@@ -449,6 +442,8 @@ public class messageResource extends ListResourceBundle {
 							+ "[--out [filename]][--binary [fileSizeLimit]]"
 							+ System.getProperty("line.separator")
 							+ /*"[--count maxFetchCount]*/"[--filterfile filename]"
+							+ System.getProperty("line.separator")
+							+ "[--intervals YYYYMMdd:YYYYMMdd]"
 							+ System.getProperty("line.separator")
 							+ "[--test][--force]"
 							+ System.getProperty("line.separator")
@@ -469,6 +464,8 @@ public class messageResource extends ListResourceBundle {
 							+ "[--file filename...]"
 							+ System.getProperty("line.separator")
 							+ "[--append | --replace][--count maxCommitCount]"
+							+ System.getProperty("line.separator")
+							+ "[--intervals YYYYMMdd:YYYYMMdd]"
 							+ System.getProperty("line.separator")
 							+ "[--force]"
 							+ System.getProperty("line.separator")

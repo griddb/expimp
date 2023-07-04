@@ -40,6 +40,14 @@ public abstract class GSEIFileIO {
 		}
 	};
 
+	public static ThreadLocal<Integer> getThreadLocalFilenameToolLongNumber() {
+		return m_threadLocalFileNameToolLongNumber;
+	}
+	
+	public static void setThreadLocalFileNameToolLongNumber(Integer threadLocalFileNameToolLongNumber) {
+		m_threadLocalFileNameToolLongNumber.set(threadLocalFileNameToolLongNumber);
+	}
+
 	//-------------------------------
 	// Common
 	//-------------------------------
@@ -78,6 +86,8 @@ public abstract class GSEIFileIO {
 	//---------------------------------------
 	// File read method
 	//---------------------------------------
+	/** DATE_FORMATの下位互換変換 */
+	abstract void changeDateFormat();
 	/** Reading in container units */
 	abstract void readContainer(ToolContainerInfo contInfo, List<String> fileNameList) throws GSEIException;
 	/** Confirmation of existence of next Row data */
@@ -158,6 +168,18 @@ public abstract class GSEIFileIO {
 				int no = m_threadLocalFileNameToolLongNumber.get();
 				m_threadLocalFileNameToolLongNumber.set(no+1);
 				encodingName += "_n" + no;
+			}
+			// TimeIntervalコンテナのロウデータファイル名は コンテナ名_ + YYYYMMdd-YYYYMMdd
+			if (toolContInfo.getIntervals() != null && toolContInfo.getIntervals().length() > 0) {
+				encodingName += "_" + toolContInfo.getIntervals(); 
+			} else {
+				// マルチコンテナの場合はスレッド番号を追加する
+				if ( Thread.currentThread() instanceof ExportThread ){
+					int id = ((ExportThread)Thread.currentThread()).getThreadNo();
+					if (toolContInfo.getFileBaseName() != null && toolContInfo.getFileBaseName().endsWith(GSConstants.FILENAME_SEPARATOR + "t" + id)) {
+						encodingName += GSConstants.FILENAME_SEPARATOR + "t" + id;
+					}
+				}
 			}
 		}
 

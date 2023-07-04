@@ -300,6 +300,103 @@ public class gridStoreServerIO {
 		return setPartitionNames;
 	}
 
+
+	/**
+	 * インターバルパーティショニングテーブル(パーティショニングキーがTimestamp型)　テーブル名一覧取得メソッド
+	 * @param conn
+	 * @return
+	 * @throws Exception
+	 */
+	public static Set<String> getIntervalPartitionTableNames(Connection conn) throws Exception{
+		Statement stmt = null;
+		ResultSet rs = null;
+		Set<String> setPartitionNames = new HashSet<String>();
+		try {
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(ToolConstants.STMT_SELECT_META_TABLES_INTERVAL_PARTITIONNAMES);
+			while (rs.next()) {
+				String partName = rs.getString(ToolConstants.META_TABLES_TABLE_NAME);
+				setPartitionNames.add(partName);
+			}
+		} catch (Exception e ){
+			throw e;
+		}
+
+		return setPartitionNames;
+	}
+	
+	/**
+	 * インターバルパーティショニングテーブル(パーティショニングキーがTimestamp型以外)　テーブル名一覧取得メソッド
+	 * @param conn
+	 * @return
+	 * @throws Exception
+	 */
+	public static Set<String> getIntervalPartitionTableNotTimestampNames(Connection conn) throws Exception{
+		Statement stmt = null;
+		ResultSet rs = null;
+		Set<String> setPartitionNames = new HashSet<String>();
+		try {
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(ToolConstants.STMT_SELECT_META_TABLES_INTERVAL_NOT_TIMESTAMP_PARTITIONNAMES);
+			while (rs.next()) {
+				String partName = rs.getString(ToolConstants.META_TABLES_TABLE_NAME);
+				setPartitionNames.add(partName);
+			}
+		} catch (Exception e ){
+			throw e;
+		}
+
+		return setPartitionNames;
+	}
+
+	/**
+	 * ハッシュパーティショニングテーブル(パーティショニングキーがTimestamp型以外)　テーブル名一覧取得メソッド
+	 * @param conn
+	 * @return
+	 * @throws Exception
+	 */
+	public static Set<String> getHashParitionTableNotTimestampNames(Connection conn) throws Exception{
+		Statement stmt = null;
+		ResultSet rs = null;
+		Set<String> setPartitionNames = new HashSet<String>();
+		try {
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(ToolConstants.STMT_SELECT_META_TABLES_HASH_NOT_TIMESTAMP_PARTITIONNAMES);
+			while (rs.next()) {
+				String partName = rs.getString(ToolConstants.META_TABLES_TABLE_NAME);
+				setPartitionNames.add(partName);
+			}
+		} catch (Exception e ){
+			throw e;
+		}
+
+		return setPartitionNames;
+	}
+	
+	/**
+	 * TimeSeriesコンテナ　コンテナ名一覧取得メソッド
+	 * @param conn
+	 * @return
+	 * @throws Exception
+	 */
+	public static Set<String> getTimeSeriesContainerNames(Connection conn) throws Exception{
+		Statement stmt = null;
+		ResultSet rs = null;
+		Set<String> setContainerNames = new HashSet<String>();
+		try {
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(ToolConstants.STMT_SELECT_META_TIMESERIES_NAMES);
+			while (rs.next()) {
+				String partName = rs.getString(ToolConstants.META_TABLES_TABLE_NAME);
+				setContainerNames.add(partName);
+			}
+		} catch (Exception e ){
+			throw e;
+		}
+
+		return setContainerNames;
+	}
+
 	/**
 	 * Method to create container on GridStore
 	 *

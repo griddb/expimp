@@ -14,14 +14,17 @@
 package com.toshiba.mwcloud.gs.tools.expimp;
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -203,6 +206,7 @@ public class cmdAnalyze {
 		boolean list_flag_param = false;
 		String optionMsg = "";
 		TARGET_TYPE targetType = TARGET_TYPE.NONE;
+		SimpleDateFormat sdf = new SimpleDateFormat(GSConstants.DATE_INTERVAL_FORMAT);//インターバルのデータフォーマット
 
 		try {
 			// Initialization of CommandLineInfo object
@@ -486,6 +490,57 @@ public class cmdAnalyze {
 				optionMsg += " --force";
 			}
 
+			// BOTH EXPORT IMPORT
+			// エクスポートでファイル出力する期間intervalsを設定する
+			// インポートでファイル入力する期間intervalsを設定する
+			if (commandLine.hasOption("intervals")) {
+				String param = commandLine.getOptionValue("intervals");
+				if ( param != null ) {
+					// "[--intervals]と[--filterfile]は同時に設定できません"
+					if (commandLine.hasOption("filterfile")) {
+						sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_58"));
+						log.warn(messageResource.getString("MESS_COMM_ERR_CMD_58"));
+						return null;
+					}
+					
+					try {
+						if ( param.contains(":") ) {
+							String[] params = param.split(":");
+							String timeZoneId = cli.getIntervalTimeZoneId().replaceAll("UTC", "GMT");// SimpleDateFormatではUTC+HH:MMは使えないのでGMT+HH:MMに変換
+							try {
+								sdf.setTimeZone(TimeZone.getTimeZone(timeZoneId));// --intervalsのTimeZone(intervalTimeZone)を設定
+							} catch (Exception e) {
+								sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_57"));// "プロパティ[intervalTimeZone]の値が不正です (タイムゾーン名またはGMT+HH:mm形式で指定してください)"
+								log.warn(messageResource.getString("MESS_COMM_ERR_CMD_57")+ ":[" + cli.getIntervalTimeZoneId() + "]", e);
+								return null;
+							}
+							Date[] intervals = new Date[]{ sdf.parse(params[0]), sdf.parse(params[1])};
+							if (sdf.parse(params[0]).getTime() > sdf.parse(params[1]).getTime()) {
+								sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_56"));// "[--intervals]の値が不正です(yyyyMMdd（始点）:yyyyMMdd（終点）形式で指定して、始点 < 終点となるように指定してください)"
+								log.warn(messageResource.getString("MESS_COMM_ERR_CMD_56"));
+								return null;
+							}
+							SimpleDateFormat utcSdf = new SimpleDateFormat(GSConstants.DATE_FORMAT_NOT_TIMEZONE);
+							utcSdf.setTimeZone(TimeZone.getTimeZone("UTC"));// GridDBのTimeZoneはUTCのため、UTCに変換
+							SimpleDateFormat df = new SimpleDateFormat(GSConstants.DATE_FORMAT_NOT_TIMEZONE);
+							Date from = df.parse(utcSdf.format(intervals[0]));
+							Date to = df.parse(utcSdf.format(intervals[1]));
+							cli.setIntervals(new Date[]{ from, to });
+						} else {
+							sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_55"));// "[--intervals]の値が不正です(yyyyMMdd:yyyyMMdd形式で指定してください)"
+							log.warn(messageResource.getString("MESS_COMM_ERR_CMD_55"));
+							return null;
+						}
+					} catch (Exception e) {
+						sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_55"));// "[--intervals]の値が不正です(yyyyMMdd:yyyyMMdd形式で指定してください)"
+						log.warn(messageResource.getString("MESS_COMM_ERR_CMD_55")+ ":[" + param + "]", e);
+						return null;
+					}
+				}
+				optionMsg += " --intervals=["+param+"]";
+			}
+
+			
 			// Export-Only option check
 			if (cmdString == CMD_NAME.GS_EXPORT) {
 
@@ -820,6 +875,13 @@ public class cmdAnalyze {
 			OptionBuilder.withDescription("Export no data");
 			OptionBuilder.withLongOpt("schemaOnly");
 			opt.addOption(OptionBuilder.create());
+			
+			OptionBuilder.hasArgs(1);
+			OptionBuilder.withArgName("intervals...");
+			OptionBuilder.isRequired(false);
+			OptionBuilder.withDescription("Intervals");
+			OptionBuilder.withLongOpt("intervals");
+			opt.addOption(OptionBuilder.create());
 
 			opt.addOption("v", "verbose", false, "Verbose Mode");
 			opt.addOption("t", "test", false, "Test Mode");
@@ -935,13 +997,6 @@ public class cmdAnalyze {
 			OptionBuilder.withLongOpt("acl");
 			opt.addOption(OptionBuilder.create());
 
-			OptionBuilder.hasOptionalArg();
-			OptionBuilder.withArgName("Parallel Count");
-			OptionBuilder.isRequired(false);
-			OptionBuilder.withDescription("Parallel Count");
-			OptionBuilder.withLongOpt("parallel");
-			opt.addOption(OptionBuilder.create());
-
 			OptionBuilder.isRequired(false);
 			OptionBuilder.withDescription("Force Mode");
 			OptionBuilder.withLongOpt("force");
@@ -950,6 +1005,13 @@ public class cmdAnalyze {
 			OptionBuilder.isRequired(false);
 			OptionBuilder.withDescription("Display Tool Version");
 			OptionBuilder.withLongOpt("version");
+			opt.addOption(OptionBuilder.create());
+
+			OptionBuilder.hasArgs(1);
+			OptionBuilder.withArgName("intervals...");
+			OptionBuilder.isRequired(false);
+			OptionBuilder.withDescription("Intervals");
+			OptionBuilder.withLongOpt("intervals");
 			opt.addOption(OptionBuilder.create());
 
 			opt.addOption("l", "list", false, "Display Container List in Local File");

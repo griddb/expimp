@@ -126,6 +126,13 @@ public class importMain {
 			if (!silent) System.out.println(errMsg);
 			log.error(errMsg, error);
 			status = false;
+		} catch (Error error) {
+			if (!silent) {
+				// An error occurred during the import process
+				System.out.println(messageResource.getString("MESS_IMPORT_ERR_IMPORTMAIN_4"));
+			}
+			log.error(messageResource.getString("MESS_IMPORT_ERR_IMPORTMAIN_4"), error);
+			status = false;
 		}
 
 		if ( status ){

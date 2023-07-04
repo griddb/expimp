@@ -24,7 +24,11 @@ import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -59,8 +63,11 @@ import com.toshiba.mwcloud.gs.experimental.PrivilegeInfo.RoleType;
 import com.toshiba.mwcloud.gs.experimental.UserInfo;
 import com.toshiba.mwcloud.gs.tools.common.GridDBJdbcUtils;
 import com.toshiba.mwcloud.gs.tools.common.data.MetaContainerFileIO;
+import com.toshiba.mwcloud.gs.tools.common.data.TablePartitionProperty;
+import com.toshiba.mwcloud.gs.tools.common.data.TimeIntervalInfo;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolContainerInfo;
+import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants.RowFileType;
 import com.toshiba.mwcloud.gs.tools.expimp.GSConstants.TARGET_TYPE;
 import com.toshiba.mwcloud.gs.tools.expimp.util.Utility;
 
@@ -127,14 +134,16 @@ public class exportProcess {
 			long endTime = System.currentTimeMillis();
 
 			int containerCount = control.getContainerCount();
+			int timeIntervalContainerCount = control.getTimeIntervalContainerCount();
+
 			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_19")+comLineInfo.getDirectoryFullPath());
 			if ( commandProgressStatus.getContainerSkipCount() > 0 ) {
-				comLineInfo.sysoutString(String.format(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_23"), containerCount, commandProgressStatus.getContainerSkipCount()));
+				comLineInfo.sysoutString(String.format(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_23"), (containerCount + timeIntervalContainerCount), commandProgressStatus.getContainerSkipCount()));
 			} else {
-				comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_20")+containerCount);
+				comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_20")+(containerCount + timeIntervalContainerCount));
 			}
-			log.info("selectContainerNameList containerCount=["+containerCount+"] time=["+(endTime-startTime)+"]");
-			commandProgressStatus.setContainerCount(containerCount);
+			log.info("selectContainerNameList containerCount=["+( containerCount + timeIntervalContainerCount )+"] time=["+(endTime-startTime)+"]");
+			commandProgressStatus.setContainerCount(containerCount + timeIntervalContainerCount);
 
 
 			// ----------------------------------
@@ -185,36 +194,92 @@ public class exportProcess {
 			// Export
 			// -----------------------------------
 			startTime = System.currentTimeMillis();
+
+			// 既存の実装
+			if ( containerCount > 0 ) {
+
+				List<GSEIContInfo> containerInfoList = null;
+
 			if ( nThreads > 1 ){
-				contInfoList = new ArrayList<GSEIContInfo>();
+				containerInfoList = new ArrayList<GSEIContInfo>();
 
 				// Parallel processing
 				// Creating a thread object
-				ExportThread[] threadList = new ExportThread[nThreads];
-				for ( int i = 0; i < nThreads; i++ ){
-					threadList[i] = new ExportThread(i, comLineInfo);
+					ExportThread[] threadList = new ExportThread[nThreads];
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i] = new ExportThread(i, comLineInfo, false);
+					}
+
+					// Thread start
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i].start();
+					}
+
+					// Waiting for thread end
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i].join();
+
+						// 結果取得
+						List<GSEIContInfo> resultList = threadList[i].getContList();
+						containerInfoList.addAll(resultList);
+					}
+
+				} else {
+					// Sequential processing
+					containerInfoList = export();
 				}
-
-				// Thread start
-				for ( int i = 0; i < nThreads; i++ ){
-					threadList[i].start();
-				}
-
-				// Waiting for thread end
-				for ( int i = 0; i < nThreads; i++ ){
-					threadList[i].join();
-
-					// Get results
-					List<GSEIContInfo> resultList = threadList[i].getContList();
-					contInfoList.addAll(resultList);
-				}
-
-			} else {
-				// Sequential processing
-				contInfoList = export();
+				commandProgressStatus.addContainerSuccessCount(containerInfoList.size());
+			
+				contInfoList = new ArrayList<GSEIContInfo>(containerInfoList);
+			
 			}
-			commandProgressStatus.addContainerSuccessCount(contInfoList.size());
+			
+			// インターバルパーティションテーブルとTimeSeriesの実装
+			if ( timeIntervalContainerCount > 0 ) {
+				
+				List<GSEIContInfo> timeIntervalContainerInfoList = null;
+				
+				if (contInfoList == null) {
+					contInfoList = new ArrayList<GSEIContInfo>();
+				}
 
+				// インターバルパーティションテーブルとTimeSeriesは--outオプションはシングルコンテナ形式のみ
+				comLineInfo.setOutFlag(false);
+				
+				if ( nThreads > 1 ){
+					timeIntervalContainerInfoList = new ArrayList<GSEIContInfo>();
+
+					// Parallel processing
+					// Creating a thread object
+					ExportThread[] threadList = new ExportThread[nThreads];
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i] = new ExportThread(i, comLineInfo, true);
+					}
+
+					// Thread start
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i].start();
+					}
+
+					// Waiting for thread end
+					for ( int i = 0; i < nThreads; i++ ){
+						threadList[i].join();
+
+						// 結果取得
+						List<GSEIContInfo> resultList = threadList[i].getContList();
+						timeIntervalContainerInfoList.addAll(resultList);
+					}
+
+				} else {
+					// 逐次処理
+					timeIntervalContainerInfoList = exportTimeInterval();
+				}
+				commandProgressStatus.addContainerSuccessCount(timeIntervalContainerInfoList.size());
+
+				contInfoList.addAll(timeIntervalContainerInfoList);
+				
+			}
+			
 			endTime = System.currentTimeMillis();
 
 
@@ -697,7 +762,556 @@ public class exportProcess {
 		return contInfoList;
 	}
 
+	/**
+	 * エクスポート処理を行います。
+	 *
+	 * @return 成功したコンテナのリスト
+	 */
+	public List<GSEIContInfo> exportTimeInterval() {
 
+		long timeWrite = 0;
+		MetaContainerFileIO metaFileIO = null;
+		GSEIFileIO rowFile = null;
+		String prevDbName = null;
+		GridStore store = null;
+		Connection conn = null;
+		List<GSEIContInfo> contInfoList = new ArrayList<GSEIContInfo>();
+		Integer threadLocalFileNameToolLongNumber = 0;
+		
+		Set<String> setIntervalPartitionTable = new HashSet<String>();
+		Set<String> setTimeSeries = new HashSet<String>();
+		final FetchOption fetchOptPARTIAL = FetchOption.PARTIAL_EXECUTION;
+		
+		Calendar cal = Calendar.getInstance();
+		SimpleDateFormat sdf = new SimpleDateFormat(GSConstants.DATE_FORMAT_HOUR);
+		SimpleDateFormat sdfDay = new SimpleDateFormat(GSConstants.DATE_FORMAT_DAY);
+		final int INTERVAL_UNIT = Calendar.DATE;
+		final int INTERVAL_VALUE = 1;
+
+		// コンテナリストを管理しているオブジェクト
+		TargetContainerManager control = TargetContainerManager.getInstance();
+		TargetContainerManager.getInstance().registTimeIntervalThread(Thread.currentThread().getId());
+
+		if (GSEIFileIO.getThreadLocalFilenameToolLongNumber() != null) {
+			threadLocalFileNameToolLongNumber = GSEIFileIO.getThreadLocalFilenameToolLongNumber().get();
+		}
+		
+		// ロウデータファイル用オブジェクト生成
+		if ( !comLineInfo.getTestFlag() ){
+			metaFileIO = new MetaContainerFileIO();
+			rowFile = GSEIFileIOFactory.createFileIO(comLineInfo.getRowFileType(), comLineInfo);
+			GSEIFileIO.setThreadLocalFileNameToolLongNumber(threadLocalFileNameToolLongNumber);
+			rowFile.startWrite();
+		}
+
+
+		// 要求のループ
+		while ( true ){
+
+			// 要求取得
+			DbPartition dbPartition = control.getTimeIntervalContainerList();
+			if (dbPartition == null){
+				// 取得コンテナが無くなれば終了
+				break;
+			}
+			String dbName = dbPartition.getDbName();
+
+			try {
+				// GridStore接続 (DBが異なる場合は再接続)
+				if ( ((prevDbName == null)&&(dbName!=null)) || ((prevDbName!=null)&&(!prevDbName.equalsIgnoreCase(dbName))) || (store==null) ){
+					if ( store != null ) {
+						store.close();
+						store = null;
+					}
+					store = gridStoreServerIO.getConnection(comLineInfo, dbName);	// 接続時は、DB名の大文字小文字は区別して指定が必要。
+					prevDbName = dbName;
+
+					// AE/VEなら、JDBC接続
+					if ( comLineInfo.isJdbcEnabled() ) {
+						if (conn != null) {
+							conn.close();
+							conn = null;
+						}
+						conn = gridStoreServerIO.getJdbcConnection(comLineInfo, dbName);	// 接続時は、DB名の大文字小文字は区別して指定が必要。
+
+						// JDBC接続したときには、パーティションテーブル名の一覧を取得する
+						setIntervalPartitionTable = gridStoreServerIO.getIntervalPartitionTableNames(conn);
+						// TimeSeriesコンテナ名の一覧を取得する
+						setTimeSeries = gridStoreServerIO.getTimeSeriesContainerNames(conn);
+					}
+				}
+				
+				// コンテナループ
+				for ( String contName: dbPartition.getContainerList() ){
+					timeWrite = 0;
+					long startTimeCont = System.currentTimeMillis();
+
+					Container<?, Row> container = null;
+					Query<Row> query = null;
+					RowSet<Row> rs = null;
+					ToolContainerInfo toolContInfo = null;
+					long rsCount = 0;
+					
+					Timestamp maxBoundaryValue = null;
+					Timestamp minBoundaryValue = null;
+					String min = null;
+					String max = null;
+					String intervalColumn = null;// パーティショニングキーまたはロウキー
+					List<String> boundaryValues = new ArrayList<String>();// エクスポートファイルの境界値（日付）一覧
+					Boolean schemaOnly = false;
+					Boolean intervalFit = true;
+					
+					List<TimeIntervalInfo> timeIntervalInfos = new ArrayList<TimeIntervalInfo>();
+					
+					try{
+						// メタデータファイル用オブジェクト
+						toolContInfo = new ToolContainerInfo();
+						toolContInfo.setDbName(dbName);
+						toolContInfo.setPartitionNo(dbPartition.getPartitionId());
+						toolContInfo.setContainerFileType(comLineInfo.getRowFileType());
+
+						// コンテナ情報取得
+						ContainerInfo contInfo = store.getContainerInfo(contName);
+						if ( contInfo == null ) {
+							throw new GSEIException(messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_18"));
+						}
+						toolContInfo.setContainerInfo(contInfo);
+						contName = contInfo.getName();
+						
+						// インターバルパーティショニングテーブル　かつ　コンテナ定義のみの出力でない
+						if ( setIntervalPartitionTable.contains(contInfo.getName()) && comLineInfo.getSchemaOnlyFlag() == false ){
+							// パーティションテーブルの場合は、JDBC経由で取得する。
+							List<TablePartitionProperty> tablePartitionProperties = GridDBJdbcUtils.getTablePartitionProperties(conn, contInfo.getName());
+							toolContInfo.setTablePartitionProperties(tablePartitionProperties);
+							toolContInfo.setExpirationInfo(GridDBJdbcUtils.getExpirationInfo(conn, contInfo.getName()));
+							Statement stmt = null;
+							ResultSet resultSet = null;
+							stmt = conn.createStatement();
+							// インターバルパーティショニングテーブルの境界値(日付)の最大値と最小値を取得
+							String q = "SELECT MAX(PARTITION_BOUNDARY_VALUE) as BOUNDARY_MAX, MIN(PARTITION_BOUNDARY_VALUE) as BOUNDARY_MIN FROM " 
+									+ "\"" + "#table_partitions" + "\""+ " WHERE TABLE_NAME=" + "'" + contName + "'";
+							resultSet = stmt.executeQuery(q);
+							if (resultSet.next()) {
+								maxBoundaryValue = resultSet.getTimestamp("BOUNDARY_MAX");
+								minBoundaryValue = resultSet.getTimestamp("BOUNDARY_MIN");
+							}
+							
+							// 境界値(日付)の最大値または最大値がNULLの場合、空のテーブル
+							if (maxBoundaryValue == null || minBoundaryValue == null) {
+								schemaOnly = true;
+							} else {
+								
+								int partitionIntervalValue = 1;
+								String partitionIntervalUnitStr = "";
+								int partitionIntervalUnit = Calendar.DATE;
+								
+								String q2 = "SELECT PARTITION_INTERVAL_VALUE,PARTITION_INTERVAL_UNIT FROM " 
+										+ "\"" + "#tables" + "\""+ " WHERE TABLE_NAME=" + "'" + contName + "'";
+								resultSet = stmt.executeQuery(q2);
+								if (resultSet.next()) {
+									partitionIntervalValue = resultSet.getInt("PARTITION_INTERVAL_VALUE");
+									partitionIntervalUnitStr = resultSet.getString("PARTITION_INTERVAL_UNIT");
+								}
+								if (partitionIntervalUnitStr != null && partitionIntervalUnitStr.length() > 0) {
+									switch(partitionIntervalUnitStr) {
+										case "DAY":
+											partitionIntervalUnit = Calendar.DATE;
+											break;
+									}
+								}
+								
+								intervalColumn = tablePartitionProperties.get(0).getColumn();
+								cal.setTime(maxBoundaryValue);
+								cal.add(partitionIntervalUnit, partitionIntervalValue);
+								maxBoundaryValue = new Timestamp(cal.getTime().getTime());
+							
+								Date[] intervals = comLineInfo.getIntervals();
+								if ( intervals != null && intervals.length > 1 ) {
+									// intervalsと境界値(日付)の最大値、最小値を比較する
+
+									// 境界値の最小値 < --intervalsの終点 < 境界値の最大値
+									if ( minBoundaryValue.getTime() < intervals[1].getTime() && intervals[1].getTime() < maxBoundaryValue.getTime() ) {
+										maxBoundaryValue = new Timestamp(intervals[1].getTime());// 境界値の最大値を--intervalsの終点に変更
+									}
+									// --intervalsの始点と終点 < 境界値の最小値
+									else if ( intervals[0].getTime() < minBoundaryValue.getTime() && intervals[1].getTime() < minBoundaryValue.getTime() ) {
+										min = sdf.format(intervals[0]);// 境界値の最小値を--intervalsの始点に変更
+										max = sdf.format(intervals[1]);// 境界値の最大値を--intervalsの終点に変更
+										intervalFit = false;// 外れ値・一致するロウデータは0件
+									}
+									// --intervalsの始点と終点 > 境界値の最大値
+									else if ( intervals[0].getTime() > maxBoundaryValue.getTime() && intervals[1].getTime() > maxBoundaryValue.getTime() ) {
+										min = sdf.format(intervals[0]);// 境界値の最小値を--intervalsの始点に変更
+										max = sdf.format(intervals[1]);// 境界値の最大値を--intervalsの終点に変更
+										intervalFit = false;// 外れ値・一致するロウデータは0件
+									}
+									// 境界値の最小値 < --intervalsの始点 < 境界値の最大値
+									if ( minBoundaryValue.getTime() < intervals[0].getTime() && intervals[0].getTime() < maxBoundaryValue.getTime()) {
+										minBoundaryValue = new Timestamp(intervals[0].getTime());// 境界値の最小値を--intervalsの始点に変更
+									}
+								}
+							
+								// エクスポートファイルの境界値（日付）一覧を作成
+								if (intervalFit) {
+									min = sdf.format(minBoundaryValue);// フォーマット変換 yyyy-MM-dd'T'HH:00:00.000Z
+									String minDay = sdfDay.format(minBoundaryValue);// フォーマット変換 yyyy-MM-dd'T'00:00:00.000Z
+									Timestamp base = minBoundaryValue;
+									// intervalTimeZoneでUTCとズレた場合の対応
+									// yyyy-MM-dd'T'HH:00:00.000Zとyyyy-MM-dd'T'00:00:00.000Zが異なる場合
+									// HH分丸めてしまうので補完する
+									if (!min.equals(minDay)) {
+										boundaryValues.add(sdf.format(base));
+										cal.setTime(sdfDay.parse(minDay));
+										cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+										base = new Timestamp(cal.getTime().getTime());
+									}
+									// 境界値(日付)の最小値から最大値まで1日区切りで各境界値（日付）を作成する
+									while(base.getTime() < maxBoundaryValue.getTime()) {
+										boundaryValues.add(sdf.format(base));
+										cal.setTime(base);
+										cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+										base = new Timestamp(cal.getTime().getTime());
+									}
+									max = sdf.format(maxBoundaryValue);
+									boundaryValues.add(max);
+									schemaOnly = false;
+								} else {
+									String warnMsg = messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_25") 
+											+ comLineInfo.getIntervals()[0] + " - " + comLineInfo.getIntervals()[1];
+									comLineInfo.sysoutString(warnMsg);
+									log.warn(warnMsg);
+								}
+							}
+						}
+
+						// 検索
+						container = store.getContainer(contName);
+
+						// TimeSeries　かつ　インターバルパーティショニングテーブルでない　コンテナ定義のみの出力でない
+						if ( boundaryValues.size() == 0 && setTimeSeries.contains(contInfo.getName()) && comLineInfo.getSchemaOnlyFlag() == false) {
+							
+							Statement stmt = null;
+							ResultSet resultSet = null;
+							int numRows = 0;
+							stmt = conn.createStatement();
+							// コンテナのロウ数を取得する
+							String q = "SELECT NUM_ROWS FROM " + "\"" + "#tables_stats" + "\""+ " WHERE TABLE_NAME=" + "'" + contName + "'";
+							resultSet = stmt.executeQuery(q);
+							if (resultSet.next()) {
+								numRows = resultSet.getInt("NUM_ROWS");
+							}
+							
+							String rowKey = contInfo.getColumnInfo(0).getName();
+							// コンテナのロウ数が0の場合は境界値の最大値、最小値はNULL
+							if (numRows == 0) {
+								maxBoundaryValue = null;
+								minBoundaryValue = null;
+							} else {
+								// TimeSeriesのロウキーの最大値を取得
+								Query<Row> queryMax = container.query("SELECT TIME_PREV(*, TIMESTAMP('9999-12-31T23:59:59.000Z'))");
+								RowSet<Row> rsMax = queryMax.fetch();
+								if ( rsMax.hasNext() ) {
+									Row row = rsMax.next();
+									maxBoundaryValue = new Timestamp(row.getTimestamp(0).getTime());
+								}
+
+								// TimeSeriesのロウキーの最小値を取得
+								Query<Row> queryMin = container.query("SELECT TIME_NEXT(*, TIMESTAMP('1970-01-01T00:00:00.000Z'))");
+								RowSet<Row> rsMin = queryMin.fetch();
+								if (rsMin.hasNext()) {
+									Row row = rsMin.next();
+									minBoundaryValue = new Timestamp(row.getTimestamp(0).getTime());
+								}
+							}
+							
+							// 境界値(日付)の最大値または最大値がNULLの場合、空のテーブル
+							if (maxBoundaryValue == null || minBoundaryValue == null) {
+								schemaOnly = true;
+							} else {
+							
+								intervalColumn = rowKey;
+								boundaryValues = new ArrayList<String>();
+								cal.setTime(maxBoundaryValue);
+								cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+								maxBoundaryValue = new Timestamp(cal.getTime().getTime());
+							
+								Date[] intervals = comLineInfo.getIntervals();
+								intervalFit = true;
+								if ( intervals != null && intervals.length > 1 ) {
+									// intervalsと境界値(日付)の最大値、最小値を比較する
+									
+									// 境界値の最小値 < --intervalsの終点 < 境界値の最大値
+									if ( minBoundaryValue.getTime() < intervals[1].getTime() && intervals[1].getTime() < maxBoundaryValue.getTime() ) {
+										maxBoundaryValue = new Timestamp(intervals[1].getTime());// 境界値の最大値を--intervalsの終点に変更
+									}
+									// --intervalsの始点と終点 < 境界値の最小値　　
+									else if ( intervals[0].getTime() < minBoundaryValue.getTime() && intervals[1].getTime() < minBoundaryValue.getTime() ) {
+										min = sdf.format(intervals[0]);// 境界値の最小値を--intervalsの始点に変更
+										max = sdf.format(intervals[1]);// 境界値の最大値を--intervalsの終点に変更
+										intervalFit = false;// 外れ値・一致するロウデータは0件
+									}
+									// --intervalsの始点と終点 > 境界値の最大値
+									else if ( intervals[0].getTime() > maxBoundaryValue.getTime() && intervals[1].getTime() > maxBoundaryValue.getTime() ) {
+										min = sdf.format(intervals[0]);// 境界値の最小値を--intervalsの始点に変更
+										max = sdf.format(intervals[1]);// 境界値の最大値を--intervalsの終点に変更
+										intervalFit = false;// 外れ値・一致するロウデータは0件
+									}
+									// 境界値の最小値 < --intervalsの始点 < 境界値の最大値　
+									if ( minBoundaryValue.getTime() < intervals[0].getTime() && intervals[0].getTime() < maxBoundaryValue.getTime()) {
+										minBoundaryValue = new Timestamp(intervals[0].getTime());// 境界値の最小値を--intervalsの始点に変更
+									}
+								}
+							
+								// エクスポートファイルの境界値（日付）一覧を作成
+								if (intervalFit) {
+									min = sdf.format(minBoundaryValue);// フォーマット変換 yyyy-MM-dd'T'HH:00:00.000Z
+									String minDay = sdfDay.format(minBoundaryValue);// フォーマット変換 yyyy-MM-dd'T'00:00:00.000Z
+									Timestamp base = minBoundaryValue;
+									// intervalTimeZoneでUTCとズレた場合の対応
+									// yyyy-MM-dd'T'HH:00:00.000Zとyyyy-MM-dd'T'00:00:00.000Zが異なる場合
+									// HH分丸めてしまうので補完する
+									if (!min.equals(minDay)) {
+										boundaryValues.add(sdf.format(base));
+										cal.setTime(sdfDay.parse(minDay));
+										cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+										base = new Timestamp(cal.getTime().getTime());
+									}
+									// 境界値(日付)の最小値から最大値まで1日区切りで各境界値（日付）を作成する
+									while(base.getTime() < maxBoundaryValue.getTime()) {
+										boundaryValues.add(sdf.format(base));
+										cal.setTime(base);
+										cal.add(INTERVAL_UNIT, INTERVAL_VALUE);
+										base = new Timestamp(cal.getTime().getTime());
+									}
+							
+									max = sdf.format(maxBoundaryValue);
+									boundaryValues.add(max);
+									schemaOnly = false;
+								} else {
+									String warnMsg = messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_25") 
+											+ comLineInfo.getIntervals()[0] + " - " + comLineInfo.getIntervals()[1];
+									comLineInfo.sysoutString(warnMsg);
+									log.warn(warnMsg);
+								}
+							}
+						}
+												
+						String queryString = getQueryStr(toolContInfo);
+												
+						String startBoundaryValue = null;
+						
+						if (comLineInfo.getSchemaOnlyFlag() || schemaOnly || intervalFit == false) {
+							// V4.5 コンテナの定義のみエクスポートが指定されている場合はロウデータ取得は行わない
+						} else if (comLineInfo.getTestFlag()) {
+							// テストモード
+							rsCount = getRowCount(store, conn, setIntervalPartitionTable, contName, container);
+						} else {
+							// エクスポートファイルの境界値（日付）一覧でループ
+							// 日付範囲のクエリを発行
+							for (String boundaryValue : boundaryValues) {
+								if(!boundaryValue.equals(min)) {
+									try {
+										String tql = null;
+										String whereOrAnd = " WHERE ";
+										if (!boundaryValue.equals(max)){
+											// 検索クエリにファイルの境界値(日付)の条件を追加する
+											tql = queryString
+													+ whereOrAnd + "TIMESTAMP('" + startBoundaryValue + "') <= " + "\"" + intervalColumn + "\""
+													+ " AND " + "\"" + intervalColumn + "\"" + " < " + "TIMESTAMP('" + boundaryValue + "')";
+										} else {
+											// 検索クエリにファイルの境界値(日付)の条件を追加する
+											tql = queryString
+													+ whereOrAnd + "TIMESTAMP('" + startBoundaryValue + "') <= " + "\"" + intervalColumn + "\""
+													+ " AND " + "\"" + intervalColumn + "\"" + " <= " + "TIMESTAMP('" + boundaryValue + "')";									
+										}
+										query = container.query(tql);
+										query.setFetchOption(fetchOptPARTIAL, true);
+										rs = query.fetch();
+									} catch ( GSException ex ){
+										// 検索でエラーが発生しました。
+										String errMsg = messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_23") + queryString;
+										throw new GSEIException(errMsg, ex);
+									}
+									
+									// 検索クエリに一致するロウデータが存在しない場合はロウデータファイルは作成しない
+									if (!rs.hasNext()) {
+										startBoundaryValue = boundaryValue;
+										continue;
+									}
+											
+									// ロウデータ取得&出力
+									int rowNum = 0;
+									long startTimeWrite = System.currentTimeMillis();
+
+									// ロウデータファイル名を設定する
+									toolContInfo.setName(contName + "_" + startBoundaryValue.substring(0, 10) + "_" + boundaryValue.substring(0,10));
+									// ロウデータファイルの境界値(日付)を設定する
+									toolContInfo.setIntervals(startBoundaryValue.substring(0, 10) + "_" + boundaryValue.substring(0,10));
+									
+									rowFile.startWriteContainer(toolContInfo);
+									timeWrite += ( System.currentTimeMillis() - startTimeWrite );
+									
+									// ロウデータファイルへのロウデータの書き込み
+									while (rs.hasNext()) {
+										Row row = rs.next();
+										startTimeWrite = System.currentTimeMillis();
+										rowFile.writeRow(row, rowNum++);
+										timeWrite += ( System.currentTimeMillis() - startTimeWrite );
+										rsCount++;
+									}
+									
+									startTimeWrite = System.currentTimeMillis();
+									rowFile.endWriteContainer();
+									timeWrite += ( System.currentTimeMillis() - startTimeWrite );
+
+									if ( rowNum == 0 ){
+										toolContInfo.setContainerFile(null);
+									} else {
+										// 出力形式がバイナリの場合
+										if (comLineInfo.getRowFileType().equals(RowFileType.BINARY)) {
+											String div = rowFile.m_file.getName()
+													.replaceAll(toolContInfo.getFileBaseName(), "")
+													.replaceAll(GSConstants.FILENAME_SEPARATOR_DIV, "")
+													.replaceAll(GSConstants.FILE_EXT_BINARY_SINGLE, "");
+											Integer divNum = Integer.valueOf(div);// バイナリ形式 サイズ区切りのファイル数
+													
+											for (int j = 0; j <= divNum; j++) {
+												String containerFile = toolContInfo.getFileBaseName()
+														+ GSConstants.FILENAME_SEPARATOR_DIV + j
+														+ GSConstants.FILE_EXT_BINARY_SINGLE;
+												// タイムインターバル情報を作成
+												TimeIntervalInfo timeIntervalInfo = new TimeIntervalInfo(containerFile, startBoundaryValue);
+												timeIntervalInfos.add(timeIntervalInfo);
+											}
+										} 
+										// 出力形式がcsvの場合
+										else if (comLineInfo.getRowFileType().equals(RowFileType.CSV)) {
+											// タイムインターバル情報を作成
+											TimeIntervalInfo timeIntervalInfo = new TimeIntervalInfo(rowFile.m_file.getName(), startBoundaryValue);
+											timeIntervalInfos.add(timeIntervalInfo);
+										}
+									}
+								}
+								startBoundaryValue = boundaryValue;
+							}
+						}
+						
+						if ( comLineInfo.getTestFlag() ){
+							// テストモードの時は件数を出力するだけ。ROWは取り出さない。
+							// V4.2 コンテナ名 パーティションID ロウ数 を出力
+							String outputLine = String.format("%-41s", toolContInfo.getFullName()) + " "
+									+ String.format("%11s", toolContInfo.getPartitionNo())
+									+ " " + String.format("%11s", rsCount);
+							comLineInfo.sysoutString(outputLine);
+							GSEIContInfo eiContInfo = new GSEIContInfo(toolContInfo.getDbName(), toolContInfo.getName(),
+									toolContInfo.getFileBaseName() + ToolConstants.FILE_EXT_METAINFO);
+							contInfoList.add(eiContInfo);
+							continue;
+						}
+						
+						// タイムインターバル情報を設定
+						toolContInfo.setTimeIntervalInfos(timeIntervalInfos);
+						
+						// メタデータファイル名を設定
+						toolContInfo.setName(contName);
+						toolContInfo.setIntervals(null);
+						if (contName.length() > 140) {
+							if (GSEIFileIO.getThreadLocalFilenameToolLongNumber() != null) {
+								threadLocalFileNameToolLongNumber = GSEIFileIO.getThreadLocalFilenameToolLongNumber().get();
+							}
+							if (comLineInfo.getSchemaOnlyFlag() || schemaOnly || intervalFit == false) {
+								GSEIFileIO.setThreadLocalFileNameToolLongNumber(threadLocalFileNameToolLongNumber);
+							} else {
+								// メタデータファイル設定時に+1するため、事前に-1する（メタデータファイル名の連番とロウデータファイル名の連番がズレるため）
+								GSEIFileIO.setThreadLocalFileNameToolLongNumber(threadLocalFileNameToolLongNumber - 1);
+							}
+						}
+						GSEIFileIO.createRowFileName(toolContInfo, comLineInfo);
+						
+						// メタデータファイル出力
+						metaFileIO.writeMetaFile(toolContInfo, comLineInfo.getDirectoryPath(), comLineInfo.getOutFlag());
+
+						// エクスポート実行情報ファイル用の情報
+						GSEIContInfo eiContInfo = new GSEIContInfo(toolContInfo.getDbName(), toolContInfo.getName(),
+								toolContInfo.getFileBaseName() + ToolConstants.FILE_EXT_METAINFO);
+						contInfoList.add(eiContInfo);
+
+						long endTimeCont = System.currentTimeMillis();
+
+						if ( comLineInfo.getSchemaOnlyFlag() ) {
+							// V4.5 コンテナの定義のみエクスポートが指定されている場合はロウデータ件数の出力は行わない
+							comLineInfo.sysoutString(toolContInfo.getFullName());
+						} else {
+							comLineInfo.sysoutString(toolContInfo.getFullName()+" : "+rsCount);
+						}
+						log.info("export: db,"+toolContInfo.getDbName()+",name,"+toolContInfo.getName()+",count,"+rsCount+",Time all,"
+								+(endTimeCont-startTimeCont)+",export,"+(endTimeCont-startTimeCont-timeWrite)
+								+",write,"+timeWrite);
+
+
+					} catch ( Exception e ){
+						String errMsg = messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_5")
+								+ ": containerName=["+contName+"] msg=["+ e.getMessage()+"]";
+						commandProgressStatus.setContainerStatus(toolContInfo.getFullName(), false, errMsg);
+						if ( !comLineInfo.getForceFlag() ){
+							if ( !(e instanceof GSEIException) ){
+								e = new GSEIException(errMsg, e);
+							}
+							exportProcess.m_stopFlag = true;
+							throw e;
+						} else {
+							// --forceオプションが指定されている場合はログに出力して継続する
+							comLineInfo.sysoutString(errMsg);
+							log.error(errMsg, e);
+						}
+
+					} finally {
+						if ( rs != null ) rs.close();
+						if ( query != null ) query.close();
+						if ( container != null ) container.close();
+					}
+
+					// スレッド停止チェック
+					if ( exportProcess.m_stopFlag ){
+						break;
+					}
+
+				} // コンテナループ
+
+			} catch ( Exception e ){
+				String errMsg = null;
+				if ( e instanceof GSEIException ){
+					errMsg = e.getMessage();
+				} else {
+					errMsg = messageResource.getString("MESS_EXPORT_ERR_EXPORTPROC_5") + " msg=["+e.getMessage()+"]";
+					commandProgressStatus.setContainerStatus(null, false, errMsg);
+				}
+				log.error(errMsg, e);
+				exportProcess.m_stopFlag = true;
+				break;	// ここでのエラーは継続せずに抜ける
+			}
+
+			// スレッド停止チェック
+			if ( exportProcess.m_stopFlag ){
+				break;
+			}
+
+		} // 要求取得のループ
+
+		if ( !comLineInfo.getTestFlag() ){
+			metaFileIO.writeEnd();
+			rowFile.endWrite();
+		}
+
+		if ( store != null ) {
+			try {
+				store.close();
+			} catch (GSException e) {}
+		}
+
+		return contInfoList;
+	}
+	
 	/**
 	 * Gets the number of rows in the container for the --test option.
 	 *
@@ -923,6 +1537,7 @@ class ExportThread extends Thread {
 	 */
 	List<GSEIContInfo> m_contInfoList;
 
+	Boolean m_timeintervalContainerFlg;
 
 	/**
 	 * constructor
@@ -930,9 +1545,10 @@ class ExportThread extends Thread {
 	 * @param threadNo Thread number
 	 * @param opertationInfo Setting information object
 	 */
-	ExportThread(int threadNo, commandLineInfo opertationInfo){
+	ExportThread(int threadNo, commandLineInfo opertationInfo, Boolean timeintervalContainerFlg){
 		m_threadNo = threadNo;
 		m_operationInfo = opertationInfo;
+		m_timeintervalContainerFlg = timeintervalContainerFlg;
 	}
 
 
@@ -955,7 +1571,11 @@ class ExportThread extends Thread {
 	public void run(){
 
 		exportProcess proc = new exportProcess(m_operationInfo);
-		m_contInfoList = proc.export();
+		if (m_timeintervalContainerFlg == false) {// 通常のコンテナ
+			m_contInfoList = proc.export();
+		} else {// タイムインターバルコンテナ
+			m_contInfoList = proc.exportTimeInterval();
+		}
 
 	}
 }

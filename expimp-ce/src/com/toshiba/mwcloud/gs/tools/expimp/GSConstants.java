@@ -48,13 +48,16 @@ public class GSConstants {
 
 
 	/** Meta information file format version */
-	public static String EXPORT_MNG_FILE_VERSION		= "4.3.0";
+	public static String EXPORT_MNG_FILE_VERSION		= "5.3.0";
 
 	// V2.7.0 is not compatible with previous files
 	public static String EXPORT_MNG_FILE_VERSION_1		= "2.7.0";
 
 	// V3.5.0 has a different binary file format from V2.7.0 format
 	public static String EXPORT_MNG_FILE_VERSION_2		= "3.5.0";
+
+	// V5.2.0はV5.1.0以前とDATE_FORMATの値が異なる
+	public static String EXPORT_MNG_FILE_VERSION_3		= "5.2.0";
 
 	public enum DataSourceType{
 		Http
@@ -154,6 +157,10 @@ public class GSConstants {
 
 	public static final String PROP_AUTHENTICATION_METHOD	= "authenticationMethod";
 	public static final String PROP_SSL_MODE					= "sslMode";
+	public static final String PROP_VALUE_SSL_MODE_DISABLED		= "DISABLED";
+	public static final String PROP_VALUE_SSL_MODE_PREFERRED	= "PREFERRED";
+	public static final String PROP_VALUE_SSL_MODE_REQUIRED		= "REQUIRED";
+	public static final String PROP_VALUE_SSL_MODE_VERIFY		= "VERIFY";
 	public static final String PROP_NOTIFICATION_INTERFACE_ADDRESS	= "notificationInterfaceAddress";
 
 	public static final String PROP_AUTHENTICATION			= "authentication";
@@ -164,6 +171,8 @@ public class GSConstants {
 
 	public static final String PROP_TRUST_STORE_PASSWORD = "trustStore.password";
 
+	public static final String PROP_INTERVAL_TIMEZONE = "intervalTimeZone";
+	
 	//******************************************************************
 	// Item name of Export management file (gs_export.json)
 	//******************************************************************
@@ -183,8 +192,12 @@ public class GSConstants {
 	public static final String JSON_FILTER_CONDITION		= "filterCondition";
 
 
-	public static final String DATE_FORMAT					= "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+	public static final String DATE_FORMAT					= "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
+	public static final String DATE_FORMAT_BEFORE					= "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 	public static final String DATE_FORMAT_NOT_TIMEZONE		= "yyyy-MM-dd'T'HH:mm:ss.SSS";
+	public static final String DATE_FORMAT_DAY			= "yyyy-MM-dd'T'00:00:00.000Z";
+	public static final String DATE_FORMAT_HOUR			= "yyyy-MM-dd'T'HH:00:00.000Z";
+	public static final String DATE_INTERVAL_FORMAT	= "yyyyMMdd";
 
 
 

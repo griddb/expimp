@@ -42,10 +42,19 @@ import com.toshiba.mwcloud.gs.ContainerInfo;
 import com.toshiba.mwcloud.gs.GSType;
 import com.toshiba.mwcloud.gs.Geometry;
 import com.toshiba.mwcloud.gs.Row;
+import com.toshiba.mwcloud.gs.TimeUnit;
+import com.toshiba.mwcloud.gs.TimestampUtils;
+import com.toshiba.mwcloud.gs.tools.common.data.MetaContainerFileIO;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolContainerInfo;
 import com.toshiba.mwcloud.gs.tools.expimp.GSConstants.TARGET_TYPE;
 import com.toshiba.mwcloud.gs.tools.expimp.util.Utility;
+
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * CSV format raw data I/O processing class
@@ -117,6 +126,19 @@ public class rowCsvFileIO extends GSEIFileIO{
 		dateFormatNotTimezone = new SimpleDateFormat(GSConstants.DATE_FORMAT_NOT_TIMEZONE);
 	}
 
+	/**
+	 * Timestamp型の下位互換対応
+	 * V5.2以降 GSConstants.DATE_FORMAT yyyy-MM-dd'T'HH:mm:ss.SSSXXX
+	 * V5.1以前 GSConstants.DATE_FORMAT_BEFORE yyyy-MM-dd'T'HH:mm:ss.SSSZ
+	 */
+	public void changeDateFormat() {
+		// 妥当性チェックあり日付フォーマット
+		dateFormatCheck = new SimpleDateFormat(GSConstants.DATE_FORMAT_BEFORE);
+		dateFormatCheck.setLenient(false);
+			
+		// 妥当性チェックなし日付フォーマット
+		dateFormat = new SimpleDateFormat(GSConstants.DATE_FORMAT_BEFORE);
+	}
 
 	//**********************************************************************
 	// Start/end of file output
@@ -331,7 +353,7 @@ public class rowCsvFileIO extends GSEIFileIO{
 
 					// Skip to the line of the specified container
 					if ( csvLine[0].trim().equals("$")
-							&& csvLine[1].trim().equalsIgnoreCase(identifer) ) {
+							&& csvLine[1].trim().contains(identifer) ) {
 						container_found = true;
 						m_csvContName = identifer;
 						break;
@@ -490,8 +512,12 @@ public class rowCsvFileIO extends GSEIFileIO{
 				row.setDouble(columnNum, Double.parseDouble(value));
 
 			} else if (columnType.equals(GSType.TIMESTAMP)) {
-				// Use your own conversion process    (SimpleDateFormat has poor performance)
-				row.setTimestamp(columnNum, convertStr2Date(value));
+				if (MetaContainerFileIO.isPreciseColumn(row.getSchema().getColumnInfo(columnNum))) {
+					row.setPreciseTimestamp(columnNum, convertStr2Timestamp(value));
+				} else {
+					// 自前の変換処理を使用    (SimpleDataFormatは、性能が悪い)
+					row.setTimestamp(columnNum, convertStr2Date(value));
+				}
 
 			} else if ( columnType.equals(GSType.BLOB)) {
 				// BLOB is always an external file (binary)
@@ -738,6 +764,22 @@ public class rowCsvFileIO extends GSEIFileIO{
 	}
 
 	/**
+	 * Convert a string into Timestamp value
+	 *
+	 * @param value the string to convert
+	 * @return a Timestamp value
+	 * @throws ParseException
+	 */
+	private Timestamp convertStr2Timestamp(String value) throws ParseException {
+		// yyyy-MM-dd HH:mm:ss.SSS compability
+		if (value.matches("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}$")) {
+			value = value.replace(" ", "T") + "Z";
+		}
+		Timestamp columnTimeStamp = TimestampUtils.parsePrecise(value);
+		return columnTimeStamp;
+	}
+
+	/**
 	 * Check if it is a character string that specifies an external file.  Format   "@GSType:External file name"
 	 *
 	 * @param s String
@@ -956,8 +998,17 @@ public class rowCsvFileIO extends GSEIFileIO{
 				return Double.toString(row.getDouble(columnNum));
 
 			} else if (columnType.equals(GSType.TIMESTAMP)) {
-				java.util.Date date = row.getTimestamp(columnNum);
-				return dateFormat.format(date);
+				ColumnInfo columnInfo = row.getSchema().getColumnInfo(columnNum);
+				if (MetaContainerFileIO.isPreciseColumn(columnInfo)) {
+					TimeUnit    precision  = columnInfo.getTimePrecision();
+					Timestamp   timestamp  = row.getPreciseTimestamp(columnNum);
+					ZonedDateTime  zdt  = ZonedDateTime.ofInstant(timestamp.toInstant(), ZoneId.systemDefault());
+					return zdt.format(MetaContainerFileIO.getDateTimeFormatter(precision));
+				}
+				else {
+					java.util.Date date = row.getTimestamp(columnNum);
+					return dateFormat.format(date);
+				}
 
 			} else if (columnType.equals(GSType.GEOMETRY)) {
 				StringBuilder sb = new StringBuilder();
