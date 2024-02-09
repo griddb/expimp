@@ -321,6 +321,8 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	private int m_maxJobBufferSize = 512;
 
 	private String m_storeBlockSize = "64KB";
+	
+	private int m_progress = 0;
 
 
 
@@ -1277,6 +1279,24 @@ public class commandLineInfo /*implements commandLineInfo_Reader */{
 	 */
 	public void setStoreBlockSize(String storeBlockSize) {
 		m_storeBlockSize = storeBlockSize;
+	}
+	
+	/**
+	 * Get the progress row number
+	 *
+	 * @return The progress row number
+	 */
+	public int getProgress() {
+		return m_progress;
+	}
+	
+	/**
+	 * Set the progress row number
+	 *
+	 * @param progress interval row number
+	 */
+	public void setProgress(int progress) {
+		m_progress = progress;
 	}
 
 	/**

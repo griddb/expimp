@@ -46,10 +46,8 @@ import com.toshiba.mwcloud.gs.GSTimeoutException;
 import com.toshiba.mwcloud.gs.GridStore;
 import com.toshiba.mwcloud.gs.IndexInfo;
 import com.toshiba.mwcloud.gs.Row;
-import com.toshiba.mwcloud.gs.TriggerInfo;
 import com.toshiba.mwcloud.gs.experimental.DatabaseInfo;
 import com.toshiba.mwcloud.gs.experimental.ExperimentalTool;
-import com.toshiba.mwcloud.gs.experimental.ExtendedContainerInfo;
 import com.toshiba.mwcloud.gs.experimental.PrivilegeInfo;
 import com.toshiba.mwcloud.gs.experimental.PrivilegeInfo.RoleType;
 import com.toshiba.mwcloud.gs.experimental.UserInfo;
@@ -63,7 +61,6 @@ import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants.RowFileType;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolContainerInfo;
 import com.toshiba.mwcloud.gs.tools.expimp.GSConstants.TARGET_TYPE;
-import com.toshiba.mwcloud.gs.tools.expimp.util.Report;
 import com.toshiba.mwcloud.gs.tools.expimp.util.Utility;
 
 /**
@@ -489,40 +486,47 @@ public class importProcess {
 			}
 			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_21")+userInfoList.size());
 
+            int importDatabaseNum = 0;
 			// Database creation / ACL
 			Map<String, DatabaseInfo> gsDbMap = ExperimentalTool.getDatabases(store);
 			for ( Map.Entry<String, Map<String, PrivilegeInfo>> entry : dbInfoMap.entrySet() ){
-				DatabaseInfo gsDbInfo = gsDbMap.get(entry.getKey());
-				if ( gsDbInfo != null ){
-					// Check if it match
-					for ( Map.Entry<String, PrivilegeInfo> entryPri : entry.getValue().entrySet() ){
-						if ( gsDbInfo.getPrivileges().get(entryPri.getKey()) == null ){
-							throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_37")+" dbName=["+entry.getKey()+"]");
-						}
-					}
-
-				} else {
-					DatabaseInfo dbInfo = new DatabaseInfo(entry.getKey(), entry.getValue());
-					try {
-						ExperimentalTool.putDatabase(store, entry.getKey(), dbInfo, false);
-					} catch ( GSException e ){
-						throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_3D")
-								+" dbName=["+entry.getKey()+"] msg=["+e.getMessage()+"]", e);
-					}
-					if ( entry.getValue().size() > 0 ){
-						for ( Map.Entry<String, PrivilegeInfo> privilegeEntry : entry.getValue().entrySet() ){
-							try {
-								ExperimentalTool.putPrivilege(store, entry.getKey(), privilegeEntry.getKey(), privilegeEntry.getValue());
-							} catch ( GSException e ){
-								throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_3E")
-										+" dbName=["+entry.getKey()+"] user=["+entry.getKey()+"] msg=["+e.getMessage()+"]", e);
+				if (comLineInfo.getTargetType() == TARGET_TYPE.ALL ||
+						(comLineInfo.getTargetType() == TARGET_TYPE.DB &&
+						comLineInfo.getDbNamelist().contains(entry.getKey()))) {
+					importDatabaseNum++;
+					DatabaseInfo gsDbInfo = gsDbMap.get(entry.getKey());
+					if ( gsDbInfo != null ){
+						// Check if it match
+						for ( Map.Entry<String, PrivilegeInfo> entryPri : entry.getValue().entrySet() ){
+							if ( gsDbInfo.getPrivileges().get(entryPri.getKey()) == null ){
+								throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_37")+" dbName=["+entry.getKey()+"]");
 							}
 						}
+
+					} else {
+						DatabaseInfo dbInfo = new DatabaseInfo(entry.getKey(), entry.getValue());
+						try {
+							ExperimentalTool.putDatabase(store, entry.getKey(), dbInfo, false);
+						} catch ( GSException e ){
+							throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_3D")
+									+" dbName=["+entry.getKey()+"] msg=["+e.getMessage()+"]", e);
+						}
+						if ( entry.getValue().size() > 0 ){
+							for ( Map.Entry<String, PrivilegeInfo> privilegeEntry : entry.getValue().entrySet() ){
+								try {
+									ExperimentalTool.putPrivilege(store, entry.getKey(), privilegeEntry.getKey(), privilegeEntry.getValue());
+								} catch ( GSException e ){
+									throw new GSEIException(messageResource.getString("MESS_IMPORT_ERR_IMPORTPROC_3E")
+											+" dbName=["+entry.getKey()+"] user=["+entry.getKey()+"] msg=["+e.getMessage()+"]", e);
+								}
+							}
+						}
+						log.info("create database name=["+entry.getKey()+"]");
 					}
-					log.info("create database name=["+entry.getKey()+"]");
 				}
+
 			}
-			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_22")+dbInfoMap.size());
+			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_22") + importDatabaseNum);
 
 
 		} catch ( GSEIException e ){
@@ -971,6 +975,11 @@ public class importProcess {
 					// Partition table created via JDBC
 					targetContainer = createPartitionTable(conn, store, cInfo, contInfo);
 				} else {
+					// メタデータファイルにIntervalWorkerGroup・IntervalWorkerGroupPosが指定されるとエラーになる
+					if (contInfo.getIntervalWorkerGroup() != null || contInfo.getIntervalWorkerGroupPos() != null) {
+						throw new GSEIException(messageResource.getString("MESS_COMM_ERR_METAINFO_47")
+								+": db=["+contInfo.getDbName()+"] containerName=["+contInfo.getName()+"]");
+					}
 					// Regular container created with Java API
 					targetContainer = createContainer(store, cInfo, contInfo);
 				}
@@ -1121,9 +1130,11 @@ public class importProcess {
 				containerFileList = contInfo.getContainerFileList();
 			}
 
+			String containerName = contInfo.getName();
 			if (contInfo.getContainerFileType().equals(RowFileType.CSV) || 
 					contInfo.getContainerFileType().equals(RowFileType.ARCHIVE_CSV)) {
 				// csv形式は元々1ロウデータファイルのみだったため、複数ロウデータファイルに対応
+				int progress = comLineInfo.getProgress();
 				for (String containerFile:containerFileList) {
 					List<String> containerFiles = new ArrayList<String>();
 					containerFiles.add(containerFile);
@@ -1153,6 +1164,11 @@ public class importProcess {
 							m_timePut += (endMultiPut - startMultiPut);
 							rowList = new ArrayList<Row>(commitCount);
 						}
+						
+						// Write logs after every progress count
+						if (progress > 0 && ((addRowCount % progress) == 0)){
+							log.info(containerName + ": " + addRowCount +  " rows imported.");
+						}
 					}
 					if ( rowList.size() > 0 ){
 						startMultiPut = System.currentTimeMillis();
@@ -1166,6 +1182,8 @@ public class importProcess {
 				// ロウファイル読み込み開始
 				m_fileIO.readContainer(contInfo, containerFileList);
 
+				// Get the progress row number
+				int progress = comLineInfo.getProgress();
 				// ROWの読み込みと登録
 				int commitCount = comLineInfo.getCommitCount();
 				List<Row> rowList = new ArrayList<Row>(commitCount);
@@ -1187,6 +1205,10 @@ public class importProcess {
 						endMultiPut = System.currentTimeMillis();
 						m_timePut += (endMultiPut - startMultiPut);
 						rowList = new ArrayList<Row>(commitCount);
+					}
+					// Write logs after every progress count
+					if (progress > 0 && ((addRowCount % progress) == 0)){
+						log.info(containerName + ": " + addRowCount +  " rows imported.");
 					}
 				}
 				if ( rowList.size() > 0 ){
@@ -1301,7 +1323,7 @@ public class importProcess {
 	 * @throws GSEIException
 	 */
 	private Container<?, Row> createPartitionTable(Connection conn, GridStore store,
-			ContainerInfo cInfo, ToolContainerInfo metaInfo) throws GSEIException {
+			ContainerInfo cInfo, ToolContainerInfo metaInfo) throws GSEIException, GridStoreCommandException {
 
 		if ( cInfo == null ) {
 			// Create a new table because it does not exist
@@ -1368,7 +1390,7 @@ public class importProcess {
 	 * @param metaInfo
 	 * @throws GSEIException
 	 */
-	private void createPartitionTableFromMetaInfo(Connection conn, ToolContainerInfo metaInfo) throws GSEIException {
+	private void createPartitionTableFromMetaInfo(Connection conn, ToolContainerInfo metaInfo) throws GSEIException, GridStoreCommandException {
 		String sql = metaInfo.buildCreateTableStatement();
 		Statement stmt = null;
 		try {

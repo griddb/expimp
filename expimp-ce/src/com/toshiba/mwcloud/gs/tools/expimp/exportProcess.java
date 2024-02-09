@@ -200,11 +200,11 @@ public class exportProcess {
 
 				List<GSEIContInfo> containerInfoList = null;
 
-			if ( nThreads > 1 ){
-				containerInfoList = new ArrayList<GSEIContInfo>();
+				if ( nThreads > 1 ){
+					containerInfoList = new ArrayList<GSEIContInfo>();
 
-				// Parallel processing
-				// Creating a thread object
+					// Parallel processing
+					// Creating a thread object
 					ExportThread[] threadList = new ExportThread[nThreads];
 					for ( int i = 0; i < nThreads; i++ ){
 						threadList[i] = new ExportThread(i, comLineInfo, false);
@@ -333,7 +333,6 @@ public class exportProcess {
 			Map<String, UserInfo> userList = ExperimentalTool.getUsers(store);
 			Map<String, DatabaseInfo> dbList = ExperimentalTool.getDatabases(store);
 			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_21") + userList.size());
-			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_22") + dbList.size());
 			if ( comLineInfo.getTestFlag() ){
 				return;
 			}
@@ -367,37 +366,43 @@ public class exportProcess {
 			}
 			gen.writeEnd();
 
+			int exportDatabaseNum = 0;
 			// Database list, ACL list output
+			// V5.4 support [--all] with [--acl] or [--db] with [--acl]
 			gen.writeStartArray("database");
 			for(Map.Entry<String, DatabaseInfo> e : dbList.entrySet()) {
-				gen.writeStartObject();
-				gen.write("name", e.getKey());
-
-				gen.writeStartArray("acl");
-				for (Map.Entry<String, PrivilegeInfo> aclEntry : e.getValue().getPrivileges().entrySet()){
+				if (comLineInfo.getTargetType() == TARGET_TYPE.ALL || (comLineInfo.getTargetType() == TARGET_TYPE.DB && comLineInfo.getDbNamelist().contains(e.getKey()))) {
+					exportDatabaseNum++;
 					gen.writeStartObject();
-					// The contents of V4.5 acl are the same for both users and roles.
-					gen.write("username", aclEntry.getKey());
-					// V4.3 User Privilege Export / write database [] / acl [] / role values
-					PrivilegeInfo userPrivilegeInfo = aclEntry.getValue();
-					if (userPrivilegeInfo != null) {
-						RoleType userRole = userPrivilegeInfo.getRole();
-						if (RoleType.ALL.equals(userRole)) {
-							gen.write("role", "ALL");
-						} else if (RoleType.READ.equals(userRole)) {
-							gen.write("role", "READ");
+					gen.write("name", e.getKey());
+
+					gen.writeStartArray("acl");
+					for (Map.Entry<String, PrivilegeInfo> aclEntry : e.getValue().getPrivileges().entrySet()){
+						gen.writeStartObject();
+						// The contents of V4.5 acl are the same for both users and roles.
+						gen.write("username", aclEntry.getKey());
+						// V4.3 User Privilege Export / write database [] / acl [] / role values
+						PrivilegeInfo userPrivilegeInfo = aclEntry.getValue();
+						if (userPrivilegeInfo != null) {
+							RoleType userRole = userPrivilegeInfo.getRole();
+							if (RoleType.ALL.equals(userRole)) {
+								gen.write("role", "ALL");
+							} else if (RoleType.READ.equals(userRole)) {
+								gen.write("role", "READ");
+							}
 						}
+						gen.writeEnd();
 					}
 					gen.writeEnd();
+					gen.writeEnd();
 				}
-				gen.writeEnd();
-				gen.writeEnd();
 			}
 			gen.writeEnd();
 
 			gen.writeEnd();
 			gen.close();
 
+			comLineInfo.sysoutString(messageResource.getString("MESS_EXPORT_PROC_EXPORTPROC_22") + exportDatabaseNum);
 			// 5. Write file
 			File file = new File(comLineInfo.getDirectoryFullPath(), GSConstants.FILE_GS_EXPORT_ACL_JSON);
 			PrintWriter outACLFile = new PrintWriter(new BufferedWriter(
@@ -533,6 +538,7 @@ public class exportProcess {
 		Connection conn = null;
 		List<GSEIContInfo> contInfoList = new ArrayList<GSEIContInfo>();
 		Set<String> setPartitionTable = new HashSet<String>();
+		HashMap<String, Integer[]> mapTablesHasIntervalWorkerGroup = new HashMap<>();
 		//@SuppressWarnings("deprecation")
 		//final FetchOption fetchOpt = FetchOption.SIZE;
 		final FetchOption fetchOptPARTIAL = FetchOption.PARTIAL_EXECUTION;
@@ -582,6 +588,8 @@ public class exportProcess {
 
 						// Get a list of partition table names when connecting to JDBC
 						setPartitionTable = gridStoreServerIO.getPartitionTableNames(conn);
+						// V5.4 Handling data deviation
+						mapTablesHasIntervalWorkerGroup = gridStoreServerIO.getTablesHasIntervalWorkerGroup(conn);
 					}
 				}
 
@@ -614,6 +622,15 @@ public class exportProcess {
 							// For a partitioned table, get it via JDBC.
 							toolContInfo.setTablePartitionProperties(GridDBJdbcUtils.getTablePartitionProperties(conn, contInfo.getName()));
 							toolContInfo.setExpirationInfo(GridDBJdbcUtils.getExpirationInfo(conn, contInfo.getName()));
+						}
+
+						// V5.4 Handling data deviation
+						if (mapTablesHasIntervalWorkerGroup.containsKey(contInfo.getName())) {
+							Integer[] intervalWorkerGroupInfo = mapTablesHasIntervalWorkerGroup.get(contInfo.getName());
+							Integer   intervalWorkerGroup     = intervalWorkerGroupInfo[0];
+							Integer   intervalWorkerGroupPos  = intervalWorkerGroupInfo[1];
+							toolContInfo.setIntervalWorkerGroup(intervalWorkerGroup);
+							toolContInfo.setIntervalWorkerGroupPos(intervalWorkerGroupPos);
 						}
 
 						// Search
@@ -780,6 +797,7 @@ public class exportProcess {
 		
 		Set<String> setIntervalPartitionTable = new HashSet<String>();
 		Set<String> setTimeSeries = new HashSet<String>();
+		HashMap<String, Integer[]> mapTablesHasIntervalWorkerGroup = new HashMap<>();
 		final FetchOption fetchOptPARTIAL = FetchOption.PARTIAL_EXECUTION;
 		
 		Calendar cal = Calendar.getInstance();
@@ -838,6 +856,8 @@ public class exportProcess {
 						setIntervalPartitionTable = gridStoreServerIO.getIntervalPartitionTableNames(conn);
 						// TimeSeriesコンテナ名の一覧を取得する
 						setTimeSeries = gridStoreServerIO.getTimeSeriesContainerNames(conn);
+						// V5.4 Handling data deviation
+						mapTablesHasIntervalWorkerGroup = gridStoreServerIO.getTablesHasIntervalWorkerGroup(conn);
 					}
 				}
 				
@@ -981,6 +1001,14 @@ public class exportProcess {
 									comLineInfo.sysoutString(warnMsg);
 									log.warn(warnMsg);
 								}
+							}
+							// V5.4 Handling data deviation
+							if (mapTablesHasIntervalWorkerGroup.containsKey(contInfo.getName())) {
+								Integer[] intervalWorkerGroupInfo = mapTablesHasIntervalWorkerGroup.get(contInfo.getName());
+								Integer   intervalWorkerGroup     = intervalWorkerGroupInfo[0];
+								Integer   intervalWorkerGroupPos  = intervalWorkerGroupInfo[1];
+								toolContInfo.setIntervalWorkerGroup(intervalWorkerGroup);
+								toolContInfo.setIntervalWorkerGroupPos(intervalWorkerGroupPos);
 							}
 						}
 

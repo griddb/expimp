@@ -29,6 +29,7 @@ import com.toshiba.mwcloud.gs.GridStoreFactory;
 import com.toshiba.mwcloud.gs.Row;
 import com.toshiba.mwcloud.gs.tools.common.data.ToolConstants;
 import com.toshiba.mwcloud.gs.tools.expimp.util.Utility;
+import java.util.HashMap;
 
 /**
  * GGridStore access class
@@ -395,6 +396,31 @@ public class gridStoreServerIO {
 		}
 
 		return setContainerNames;
+	}
+	
+    /**
+     * Get a list of tables that has interval worker group properties
+     * @param conn the JBDC connection
+     * @return list of tables in a map (tableName -> {intervalWorkerGroup, intervalWorkerGroupPos})
+     * @throws Exception
+     */
+	public static HashMap<String, Integer[]> getTablesHasIntervalWorkerGroup(Connection conn) throws Exception {
+		HashMap<String, Integer[]> tablesMap = new HashMap<>();
+		try {
+			Statement stmt  = conn.createStatement();
+			ResultSet rs    = stmt.executeQuery(ToolConstants.STMT_SELECT_META_TABLES_INTERVAL_WORKER_GROUP);
+			while (rs.next()) {
+				String  tableName               = rs.getString(ToolConstants.META_TABLES_TABLE_NAME);
+				Integer intervalWorkerGroup     = (Integer) rs.getObject(ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP);
+				Integer intervalWorkerGroupPos  = (Integer) rs.getObject(ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP_POS);
+				Integer[] columnsMap = {intervalWorkerGroup, intervalWorkerGroupPos};
+				tablesMap.put(tableName, columnsMap);
+			}
+		} catch (Exception e ) {
+			throw e;
+		}
+
+		return tablesMap;
 	}
 
 	/**
