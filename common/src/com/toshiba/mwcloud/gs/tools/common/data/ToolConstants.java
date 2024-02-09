@@ -17,7 +17,7 @@ package com.toshiba.mwcloud.gs.tools.common.data;
 public class ToolConstants {
 
 	/** メタ情報ファイルフォーマットのバージョン */
-	public static String META_FILE_VERSION = "5.3.0";
+	public static String META_FILE_VERSION = "5.5.0";
 
 
 	/** ロウファイルのタイプ(CSV/バイナリ) */
@@ -78,6 +78,8 @@ public class ToolConstants {
 	public static final String JSON_META_EXPIRED_TIME			= "expiredTime";
 	public static final String JSON_META_ERASABLE_TIME		= "erasableTime";
 	public static final String JSON_META_SCHEMA_INFORMATION	= "schemaInformation";
+	public static final String JSON_META_INTERVAL_WORKER_GROUP      = "intervalWorkerGroup";
+	public static final String JSON_META_INTERVAL_WORKER_GROUP_POSITION  = "intervalWorkerGroupPosition";
 
 	public static final String[] JSON_META_GROUP_CONTAINER ={
 		JSON_META_DBNAME, JSON_META_CONTAINER, JSON_META_CONTAINER_TYPE, JSON_META_CONTAINER_ATTRIBUTE,
@@ -86,6 +88,7 @@ public class ToolConstants {
 		JSON_META_EXPIRATION_TYPE, JSON_META_EXPIRATION_TIME, JSON_META_EXPIRATION_TIME_UNIT,
 		JSON_META_ARCHIVE_INFO, JSON_META_NODE_ADDR, JSON_META_NODE_PORT,
 		JSON_META_DATABASE_ID, JSON_META_CONTAINER_ID, JSON_META_DATAPARTITION_ID,
+		JSON_META_INTERVAL_WORKER_GROUP, JSON_META_INTERVAL_WORKER_GROUP_POSITION,
 		JSON_META_ROW_INDEX_OID, JSON_META_MVCC_INDEX_OID, JSON_META_INIT_SCHEMA_STATUS,
 		JSON_META_SCHEMA_VERSION, JSON_META_START_TIME, JSON_META_END_TIME,
 		JSON_META_EXPIRED_TIME, JSON_META_ERASABLE_TIME, JSON_META_SCHEMA_INFORMATION
@@ -293,6 +296,9 @@ public class ToolConstants {
 	/** SQL処理一覧テーブルメタテーブル取得  */		// WHERE START_TIME < now()
 	public static final String STMT_SELECT_SQL_INFO_PAST = " WHERE START_TIME < now()";
 
+    /** select table has interval worker group **/
+	public static final String STMT_SELECT_META_TABLES_INTERVAL_WORKER_GROUP = "SELECT TABLE_NAME," + ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP + "," + ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP_POS + " FROM \"" + META_TABLES + "\" WHERE PARTITION_TYPE = 'INTERVAL' AND ((" + ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP + " IS NOT NULL) OR (" + ToolConstants.META_TABLES_INTERVAL_WORKER_GROUP_POS + " IS NOT NULL))";
+
 	/*
 	 * プリペアードステートメント
 	 */
@@ -394,6 +400,8 @@ public class ToolConstants {
 	public static final String META_TABLES_SUBPARTITION_INTERVAL_VALUE 	= "SUBPARTITION_INTERVAL_VALUE";
 	public static final String META_TABLES_SUBPARTITION_INTERVAL_UNIT 	= "SUBPARTITION_INTERVAL_UNIT";
 	public static final String META_TABLES_SUBPARTITION_DIVISION_COUNT 	= "SUBPARTITION_DIVISION_COUNT";
+	public static final String META_TABLES_INTERVAL_WORKER_GROUP 		= "PARTITION_INTERVAL_WORKER_GROUP";
+	public static final String META_TABLES_INTERVAL_WORKER_GROUP_POS 	= "PARTITION_INTERVAL_WORKER_GROUP_POSITION";
 //	public static final String META_TABLES_CLUSTER_PARTITION_INDEX 		= "CLUSTER_PARTITION_INDEX";
 
 	/*

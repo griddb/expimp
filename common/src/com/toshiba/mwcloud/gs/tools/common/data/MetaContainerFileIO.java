@@ -549,10 +549,15 @@ public class MetaContainerFileIO {
 					break;
 				case VALUE_NUMBER:
 					if ( isContainer ){
+						Integer number = jp.getInt();
 						if (key.equalsIgnoreCase(ToolConstants.JSON_META_PARTITION_NO)) {
 							ci.setPartitionNo(jp.getInt());
 						} else if (key.equalsIgnoreCase(ToolConstants.JSON_META_EXPIRATION_TIME)) {
 							expirationTime = jp.getInt();
+						} else if (key.equalsIgnoreCase(ToolConstants.JSON_META_INTERVAL_WORKER_GROUP)) {
+							ci.setIntervalWorkerGroup(number);
+						} else if (key.equalsIgnoreCase(ToolConstants.JSON_META_INTERVAL_WORKER_GROUP_POSITION)) {
+							ci.setIntervalWorkerGroupPos(number);
 						}
 					}
 					break;
@@ -775,7 +780,7 @@ public class MetaContainerFileIO {
 			}
 
 			ColumnInfo columnInfo = new ColumnInfo(columnName, columnType, nullable, null);
-			if(precision != null && columnType == GSType.TIMESTAMP) {
+			if (precision != null && columnType == GSType.TIMESTAMP) {
 				ColumnInfo.Builder builder = new ColumnInfo.Builder(columnInfo);
 				builder.setTimePrecision(precision);
 				ColumnInfo swap = builder.toInfo();
@@ -1789,6 +1794,13 @@ private JsonGenerator buildJson(ToolContainerInfo cInfo, JsonGenerator gen) thro
 		gen.writeEnd();
 	}
 
+	if (cInfo.getIntervalWorkerGroup() != null) {
+		gen.write(ToolConstants.JSON_META_INTERVAL_WORKER_GROUP,     cInfo.getIntervalWorkerGroup());
+	}
+	if (cInfo.getIntervalWorkerGroupPos() != null) {
+		gen.write(ToolConstants.JSON_META_INTERVAL_WORKER_GROUP_POSITION, cInfo.getIntervalWorkerGroupPos());
+	}
+
 	// V4.3 複合キー対応 rowKeySet追加
 	gen.writeStartArray(ToolConstants.JSON_META_ROWKEY_SET);
 	List<Integer> rowKeyColumnList = cInfo.getRowKeyColumnList();
@@ -2032,11 +2044,9 @@ public static GSType convertStringToColumnType(String type) throws GridStoreComm
 			return GSType.TIMESTAMP_ARRAY;
 		} else if (type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_BOOL)) {
 			return GSType.BOOL;
-		} else if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MILI)) {
-			return GSType.TIMESTAMP;
-		} else if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MICRO)) {
-			return GSType.TIMESTAMP;
-		} else if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_NANO)) {
+		} else if (type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MILI)
+				|| type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MICRO)
+				|| type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_NANO)) {
 			return GSType.TIMESTAMP;
 		}
 		return GSType.valueOf(type.toUpperCase().trim());
@@ -2044,13 +2054,14 @@ public static GSType convertStringToColumnType(String type) throws GridStoreComm
 	} catch (Exception e) {
 		// "カラム種別の解析処理でエラーが発生しました"
 		//throw new GridStoreCommandException(messageResource.getString("MESS_COMM_ERR_METAINFO_13")+ ": type=["
-		throw new GridStoreCommandException("Error occurded in convert to type"+ ": type=["
+		throw new GridStoreCommandException("Error occurred when converting to type"+ ": type=["
 				+type+"] msg=[" + e.getMessage()+"]", e);
 	}
 }
 
 /**
  * Convert string to value of TimeUnit type
+ *
  * @param unit the unit of precision
  * @return TimeUnit value
  * @throws GridStoreCommandException
@@ -2059,7 +2070,7 @@ public static TimeUnit convertStringToTimeUnit(String unit) throws GridStoreComm
 	try {
 		return TimeUnit.valueOf(unit.toUpperCase().trim());
 	} catch (Exception e) {
-		throw new GridStoreCommandException("Error occurded in converting to time unit"
+		throw new GridStoreCommandException("Error occurred when converting to time unit"
 				+ ": unit=[" + unit + "] msg=[" + e.getMessage() + "]", e);
 	}
 }
@@ -2069,20 +2080,21 @@ public static TimeUnit convertStringToTimeUnit(String unit) throws GridStoreComm
  *     TIMESTAMP(3) -> MILLISECOND
  *     TIMESTAMP(6) -> MICROSECOND
  *     TIMESTAMP(9) -> NANOSECOND
+ *
  * @param preciseTimestampType the precise timestamp type string
  * @return TimeUnit
  * @throws GridStoreCommandException
  */
 public static TimeUnit convertTimestampStringToTimeUnit(String preciseTimestampType) throws GridStoreCommandException {
 	String type = preciseTimestampType.trim();
-	if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MILI)) {
+	if (type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MILI)) {
 		return TimeUnit.MILLISECOND;
-	} else if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MICRO)) {
+	} else if (type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_MICRO)) {
 		return TimeUnit.MICROSECOND;
-	} else if(type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_NANO)) {
+	} else if (type.equalsIgnoreCase(ToolConstants.COLUMN_TYPE_TIMESTAMP_NANO)) {
 		return TimeUnit.NANOSECOND;
 	} else {
-		throw new GridStoreCommandException("Error occurded in convert to type"
+		throw new GridStoreCommandException("Error occurred when converting to type"
 				+ ": type=[" + type + "] msg=[Not a precise timestamp type]");
 	}
 }
@@ -2092,8 +2104,9 @@ public static TimeUnit convertTimestampStringToTimeUnit(String preciseTimestampT
  *     TimeUnit.MILLISECOND -> TIMESTAMP(3)
  *     TimeUnit.MICROSECOND -> TIMESTAMP(6)
  *     TimeUnit.NANOSECOND  -> TIMESTAMP(9)
- * @param timeUnit
- * @return String of TIMESTAMP with number
+ *
+ * @param timeUnit The precision time unit of timestamp
+ * @return String of TIMESTAMP type with numbered suffix
  * @throws GridStoreCommandException
  */
 public static String convertTimeunitToTimestampType(TimeUnit timeUnit) throws GridStoreCommandException {
@@ -2105,7 +2118,7 @@ public static String convertTimeunitToTimestampType(TimeUnit timeUnit) throws Gr
 		case NANOSECOND :
 			return ToolConstants.COLUMN_TYPE_TIMESTAMP_NANO.toUpperCase();
 		default :
-			throw new GridStoreCommandException("Error occurded in convert time unit"
+			throw new GridStoreCommandException("Error occurred when converting time unit"
 					+ ": type=[" + timeUnit.name() + "] msg=[Not a time unit]");
 	}
 }
@@ -2113,6 +2126,7 @@ public static String convertTimeunitToTimestampType(TimeUnit timeUnit) throws Gr
 /**
  * Check if a string is TIMESTAMP type  has suffix
  * The valid string is "TIMESTAMP(3)", "TIMESTAMP(6)", and "TIMESTAMP(9)"
+ *
  * @param timestampTypeHasSuffix the TIMESTAMP type  has suffix
  * @return true if the given string is timestamp type with number
  */
@@ -2124,9 +2138,10 @@ public static boolean isTimestampStringInSeconds(String timestampTypeHasSuffix) 
 }
 
 /**
- * Check if timeunit is MILLISECOND or MICROSECOND or NANOSECOND
- * @param timeUnit
- * @return true if time unit is MILLISECOND or MICROSECOND or NANOSECOND
+ * Check if time unit is MILLISECOND, MICROSECOND or NANOSECOND
+ *
+ * @param timeUnit the precision time unit of timestamp
+ * @return true if time unit is MILLISECOND, MICROSECOND or NANOSECOND
  */
 public static boolean isTimestampUnit(TimeUnit timeUnit) {
 	return TimeUnit.MILLISECOND == timeUnit
@@ -2136,7 +2151,8 @@ public static boolean isTimestampUnit(TimeUnit timeUnit) {
 
 /**
  * Check if a column is precise timestamp
- * @param columnInfo
+ *
+ * @param columnInfo GridStore column information
  * @return true if the given column is precise timestamp
  */
 public static boolean isPreciseColumn(ColumnInfo columnInfo) {
@@ -2146,7 +2162,8 @@ public static boolean isPreciseColumn(ColumnInfo columnInfo) {
 
 /**
  * Get the DateTimeFormatter base on time unit
- * @param timePrecision
+ *
+ * @param timeUnit The precision time unit of timestamp
  * @return date time format of time unit
  */
 public static DateTimeFormatter getDateTimeFormatter(TimeUnit timeUnit) {
@@ -2202,7 +2219,7 @@ private String convertColumnType(GSType type) throws GridStoreCommandException {
 	} catch (Exception e) {
 		// "カラム種別の変換処理でエラーが発生しました"
 		//throw new GridStoreCommandException(messageResource.getString("MESS_COMM_ERR_METAINFO_30")+ ": type=["
-		throw new GridStoreCommandException("Error occurded in convert to type"+ ": type=["
+		throw new GridStoreCommandException("Error occurred when converting to type"+ ": type=["
 				+type+"] msg=[" + e.getMessage()+"]", e);
 	}
 }
