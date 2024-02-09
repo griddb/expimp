@@ -9,10 +9,10 @@ The GridDB export/import tools, to recover a database from local damages or the 
 Building and program execution are checked in the environment below.
 
     OS: CentOS 7.9 (x64)
-    Java: Java™ SE Development Kit 8
-    GridDB Server: V4.6.1/V5.3.0 CE (Community Edition)
-    GridDB Java Client: V4.6.1/V5.3.0 CE (Community Edition)
-    GridDB JDBC: V4.6.0/V5.3.0 CE (Community Edition)
+    Java: OpenJDK 1.8.0
+    GridDB Server: V4.6.1/V5.5.0 CE (Community Edition)
+    GridDB Java Client: V4.6.1/V5.5.0 CE (Community Edition)
+    GridDB JDBC: V4.6.0/V5.5.0 CE (Community Edition)
     
 ## Quick start - Build and Run
 

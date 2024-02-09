@@ -226,6 +226,7 @@ cont_year2014   :select * where timestamp > TIMESTAMP('2014-05-21T08:00:00.000Z'
 - コンテナが複数の定義に該当する場合、最初に記述された定義が適用されます。
 - ファイルはUTF-8で記述してください。
 - エクスポートのテスト機能を実行すると、定義ファイルの記述が正しいかを確認することができます。
+- ORDER BYは使用できません。
 
 
 ◆タイムインターバルによる指定
@@ -251,12 +252,16 @@ $ gs_export --all -u admin/admin -d ./20210131/ --intervals 20210101:20210131
 
 GridDBクラスタのユーザやアクセス権の情報もエクスポートすることができます。 クラスタ上のすべてのデータを移行する場合にご利用ください。
 
-- --allオプションおよび--aclオプションを指定。ただし、エクスポートできるユーザ情報は、一般ユーザのみです。管理ユーザの情報は別途移行（ユーザ定義ファイルをコピー）してください。
+- --aclオプションと--allオプションまたは--dbオプションを指定。ただし、エクスポートできるユーザ情報は、一般ユーザのみです。管理ユーザの情報は別途移行（ユーザ定義ファイルをコピー）してください。
 
 【例】
 
 ``` example
 $ gs_export --all -u admin/admin --acl
+```
+
+``` example
+$ gs_export --db db001 -u admin/admin --acl
 ```
 
 【メモ】
@@ -399,6 +404,31 @@ $ gs_export --all -u admin/admin --force
 【メモ】
 -   エラーによって処理をスキップしたコンテナについても、不完全ですがコンテナデータファイルに情報を出力します。ただし、エクスポート実行ファイルには記録していないため、インポート処理されることはありません。ロウデータ取得エラー解決後、当該コンテナのエクスポート処理を再実行してください。
 
+-   --forceオプションを指定していない場合、エラーが発生した時点で、エクスポート処理を終了します。
+
+【例】
+
+``` example
+$ gs_export --all -u admin/admin
+
+エクスポートを開始します
+出力ディレクトリ : /var/lib/gridstore/export
+対象コンテナ数  : 6
+
+Name                                      PartitionId Row
+------------------------------------------------------------------
+public.container_2                                 15          10
+public.container_3                                 25          20
+[エラーが発生]
+
+対象コンテナ数 : 6 ( 成功:2  失敗:1 未処理:3  )
+
+エクスポートを終了しました
+```
+
+【注意】
+- --parallelオプションの指定時にエラーが発生しても、エクスポート処理がすぐに終了しない場合があります。
+
 ### その他の機能
 
 **動作表示の詳細指定**
@@ -506,12 +536,16 @@ $ gs_export -c c002 c001 -u admin/admin --silent
 
 エクスポート機能で--aclオプションを指定してエクスポートしたデータの場合、ユーザやアクセス権の情報もインポートすることができます。 クラスタ上のすべてのデータを移行する場合にご利用ください。
 
-- --allオプションおよび --aclオプションを指定。
+- --aclオプションと--allオプションまたは--dbオプションを指定。
 
 【例】
 
 ``` example
 $ gs_import --all --acl -u admin/admin
+```
+
+``` example
+$ gs_import --db db001 --acl -u admin/admin
 ```
 
 【メモ】
@@ -657,11 +691,51 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 【メモ】
 -   エラーが発生したコレクションは、コンテナデータファイル修正後、コンテナ置き換えオプション（--replace）を指定して再登録してください。
 
+-   --forceオプションを指定していない場合、エラーが発生した時点で、インポート処理を終了します。
+
+【例】
+
+``` example
+$ gs_import --all -u admin/admin
+
+インポートを開始します
+対象コンテナ数  : 6
+
+Name                                      PartitionId Row
+------------------------------------------------------------------
+public.container_2                                 15          10
+public.container_3                                 25          20
+[エラーが発生]
+
+対象コンテナ数 : 6 ( 成功:2  失敗:1 未処理:3  )
+
+インポートを終了しました
+```
+
+【注意】
+- --parallelオプションの指定時にエラーが発生しても、インポート処理がすぐに終了しない場合があります。
+
 ### その他の機能
 
 **動作表示の詳細指定**
 -   --verboseオプションを指定することで、処理の詳細を表示することができます。
 
+**進捗状況の出力指定**
+-  --progressオプションと値を指定することで、importで登録したロウ数を指定した値の間隔でログ出力することができます。
+
+【例】
+
+``` example
+$ gs_import --all -u admin/admin --progress 10000
+
+[gs_importのログ]
+container_1: 10000 rows imported.
+container_1: 20000 rows imported.
+container_1: 30000 rows imported.
+      ：
+  　　：
+  　　：
+```
 
 ## コマンド/オプション仕様
 
@@ -690,7 +764,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | --filterfile 定義ファイル名            |      | ロウを取り出す検索クエリを記述した定義ファイルを指定します。省略した場合は、すべてのロウがエクスポートされます。   |
   | --intervals YYYYMMdd:YYYYMMdd          |      | エクスポート対象のコンテナが日付蓄積型コンテナの場合に、エクスポートで取り出すロウの期間を指定します。指定方法は「YYYYMMdd:YYYYMMdd」フォーマットで左に開始日、右に終了日を指定します。省略した場合は、すべてのロウがエクスポートされます。filterfileオプションと同時に指定することはできません。   |
   | --parallel 並列実行数                  |      | 指定された数で並列実行を行います。並列実行を行うと、エクスポートデータは並列実行数と同じ数で分割されます。マルチコンテナ形式の場合(--outオプションを指定した場合)のみ指定できます。指定範囲は、2から32までです。      |
-  | --acl                                  |      | データベース、ユーザ、アクセス権の情報もエクスポートします。管理者ユーザで、かつ --allオプションを指定している場合のみ指定できます。 |
+  | --acl                                  |      | データベース、ユーザ、アクセス権の情報もエクスポートします。管理者ユーザで、かつ --allオプションまたは--dbオプションを指定している場合のみ指定できます。 |
   | --prefixdb データベース名              |      | --containerオプションを指定した場合に、コンテナのデータベース名を指定します。省略した場合は、デフォルトデータベースのコンテナが処理対象になります。 |
   | --force                                |      | エラーが発生しても処理を継続します。エラー内容は処理終了後に一覧表示されます。          |
   | -t｜--test                             |      | テストモードでツールを実行します。                  |
@@ -713,7 +787,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 
   | コマンド | オプション/引数 |
   |---------------------|--------------------------------------|
-  | gs_import | -u｜--user ユーザ名/パスワード<br> --all ｜ --db データベース名 \[データベース名\] ｜ ( --container コンテナ名 \[コンテナ名\] … ｜ --containerregex 正規表現 \[正規表現\] …) <br>--db データベース名 \[データベース名\]<br> \[--append｜--replace\] <br>\[-d｜--directory インポート対象ディレクトリパス\] <br> \[-f｜--file ファイル名 \[ファイル名…\]\] <br>\[--intervals YYYYMMdd:YYYYMMdd\] <br> \[--count コミット数\] <br> \[--acl\] <br> \[--prefixdb データベース名\] <br> \[--force\] <br> \[--schemaCheckSkip\] <br> \[-v｜--verbose\] <br> \[--silent\] 　|
+  | gs_import | -u｜--user ユーザ名/パスワード<br> --all ｜ --db データベース名 \[データベース名\] ｜ ( --container コンテナ名 \[コンテナ名\] … ｜ --containerregex 正規表現 \[正規表現\] …) <br>--db データベース名 \[データベース名\]<br> \[--append｜--replace\] <br>\[-d｜--directory インポート対象ディレクトリパス\] <br> \[-f｜--file ファイル名 \[ファイル名…\]\] <br>\[--intervals YYYYMMdd:YYYYMMdd\] <br> \[--count コミット数\]  <br> \[--progress 出力間隔\] <br> \[--acl\] <br> \[--prefixdb データベース名\] <br> \[--force\] <br> \[--schemaCheckSkip\] <br> \[-v｜--verbose\] <br> \[--silent\] 　|
   | gs_import | -l｜--list <br> \[-d｜--directory ディレクトリパス\] <br> \[-f｜--file ファイル名 \[ファイル名…\]\]      |
   | gs_import | --version                                   |
   | gs_import | \[-h｜--help\]                                         |
@@ -733,7 +807,8 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | -f｜--file ファイル名 \[ファイル名…\] |      | インポート対象となるコンテナデータファイルを指定します。複数指定可能です。省略時は-d(--directory)で指定したディレクトリまたはカレントディレクトリのすべてのコンテナデータファイルを対象とします。   |
   | --intervals YYYYMMdd:YYYYMMdd      |      | インポート対象となるコンテナが日付蓄積型コンテナの場合に、インポートで取り出すロウデータファイルの期間を指定します。指定方法は「YYYYMMdd:YYYYMMdd」フォーマットで左に開始日、右に終了日を指定します。省略した場合は、すべてのロウデータファイルがインポートされます。 |
   | --count コミット数                 |      | 入力データを一括コミットするまでの入力件数を指定します。 |
-  | --acl                              |      | データベース、ユーザ、アクセス権の情報もインポートします。--aclオプションを指定してエクスポートしたデータに対して、管理者ユーザで、かつ --allオプションを指定している場合のみ指定できます。   |
+  | --progress 出力間隔                |      | 登録したロウ数をログ出力する間隔を指定します。 |
+  | --acl                              |      | データベース、ユーザ、アクセス権の情報もインポートします。--aclオプションを指定してエクスポートしたデータに対して、管理者ユーザで、かつ --allオプションまたは--dbオプションを指定している場合のみ指定できます。   |
   | --prefixdb データベース名          |      | --containerオプションを指定した場合に、コンテナのデータベース名を指定します。省略した場合は、デフォルトデータベースのコンテナが処理対象になります。        |
   | --force                            |      | エラーが発生しても処理を継続します。エラー内容は処理終了後に一覧表示されます。   |
   | --schemaCheckSkip                  |      | --appendオプションを指定した場合に、既存コンテナとのスキーマチェックを行いません。   |
@@ -806,6 +881,9 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 | timeIntervalInfo     | タイムインターバル情報         | 日付蓄積型コンテナの場合は、以下の情報を配列形式で記述します | 任意     |
 | containerFile        | コンテナデータファイル名    | ファイル名  | timeIntervalInfoを記載した場合は必須 |
 | boundaryValue        | 期間                | コンテナデータの開始の日付      | timeIntervalInfoを記載した場合は必須 |
+| データパーティション配置情報  |                 |     |      |
+| intervalWorkerGroup   | 区間グループ番号            | データパーティション配置を決定するグループ番号                     | 任意             |
+| intervalWorkerGroupPosition  | 区間グループノード補正値            | 区間グループで決定したデータパーティションの処理ノードを補正する値            | 任意             |
 
 - \*1 : V4.2以前のメタデータファイルに出力される情報です。V4.3以降ではrowKeySetを使用してください。
 - \*2 : containerTypeがTIME_SERIESかつrowKeyAssignedがfalseである場合は必須です。
@@ -960,6 +1038,48 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
         "boundaryValue": "2023-01-01T00:00:00.000+0000"
       }
     ]
+  ```
+
+【メモ】
+-   区間グループ番号、区間グループノード補正値をユーザが配置指定した場合、メタ情報がjsonに記述されます。
+
+【例１】 データパーティション配置の記述例
+
+- 区間グループ番号を1、区間グループノード補正値を1として、ユーザがデータパーティション配置指定した場合
+
+  ``` example
+  {
+    "version":"5.4.0",
+    "database":"public",
+    "container":"c001",
+    "containerType":"COLLECTION",
+    "containerFileType":"csv",
+    "partitionNo":1,
+    "columnSet":[
+        { "columnName":"dt", "type":"TIMESTAMP", "notNull":true },
+        { "columnName":"val", "type":"LONG", "notNull":true }
+    ],
+    "intervalWorkerGroup":1,
+    "intervalWorkerGroupPosition":1,
+    "rowKeySet":[
+        "dt"
+    ],
+    "indexSet":[
+        {
+            "columnNames":[
+                "dt"
+            ],
+            "type":"TREE",
+            "indexName":null
+        }
+    ],
+    "tablePartitionInfo":{
+        "type":"INTERVAL",
+        "column":"dt",
+        "intervalValue":"1",
+        "intervalUnit":"DAY"
+    }
+  }
   ```
 
 ### ロウデータファイル(バイナリデータファイル)
