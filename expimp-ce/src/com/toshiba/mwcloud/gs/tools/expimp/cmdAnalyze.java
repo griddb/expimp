@@ -468,8 +468,9 @@ public class cmdAnalyze {
 			}
 
 			// BOTH EXPORT IMPORT
+			// V5.4 support [--all] with [--acl] or [--db] with [--acl]
 			if (commandLine.hasOption("acl")) {
-				if ( targetType != TARGET_TYPE.ALL ){
+				if ( targetType != TARGET_TYPE.ALL && targetType != TARGET_TYPE.DB) {
 					sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_46")); //Use [-acl] at the same time as the [--all] option
 					log.warn(messageResource.getString("MESS_COMM_ERR_CMD_46"));
 					return null;
@@ -481,7 +482,7 @@ public class cmdAnalyze {
 			// BOTH EXPORT IMPORT
 			if (commandLine.hasOption("silent")) {
 				cli.setSilentFlag(true);
-				optionMsg +=" --slient";
+				optionMsg +=" --silent";
 			}
 
 			// BOTH EXPORT IMPORT
@@ -691,6 +692,24 @@ public class cmdAnalyze {
 				if (commandLine.hasOption("schemaCheckSkip")) {
 					cli.setSchemaCheckSkipFlag(true);
 					optionMsg += " --schemaCheckSkip";
+				}
+				
+				if (commandLine.hasOption("progress")) {
+					boolean sts = true;
+					String progress = commandLine.getOptionValue("progress");
+					int progress_param = 0;
+					try {
+						progress_param = Integer.parseInt(progress);
+					} catch ( NumberFormatException e ) {
+						sts = false;
+					}
+					if ( !sts || progress_param <= 0) {
+						sysoutString(messageResource.getString("MESS_COMM_ERR_CMD_59")+ ":[" + progress + "]");
+						log.warn(messageResource.getString("MESS_COMM_ERR_CMD_59")+ ":[" + progress + "]");
+						return null;
+					}
+					cli.setProgress(progress_param);
+					optionMsg += "--progress";
 				}
 			}
 
@@ -1012,6 +1031,13 @@ public class cmdAnalyze {
 			OptionBuilder.isRequired(false);
 			OptionBuilder.withDescription("Intervals");
 			OptionBuilder.withLongOpt("intervals");
+			opt.addOption(OptionBuilder.create());
+			
+			OptionBuilder.hasArgs(1);
+			OptionBuilder.withArgName("progress...");
+			OptionBuilder.isRequired(false);
+			OptionBuilder.withDescription("Progress");
+			OptionBuilder.withLongOpt("progress");
 			opt.addOption(OptionBuilder.create());
 
 			opt.addOption("l", "list", false, "Display Container List in Local File");

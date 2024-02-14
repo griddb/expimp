@@ -20,7 +20,7 @@ import java.util.ListResourceBundle;
  */
 public class messageResource extends ListResourceBundle {
 
-	public static final String VERSION_NUM = "5.3.00";
+	public static final String VERSION_NUM = "5.5.00";
 	public static final String VERSION = "V"+VERSION_NUM;
 	public static final String GS_EXPORT_CE = "gs_export-ce";
 	public static final String GS_IMPORT_CE = "gs_import-ce";
@@ -93,7 +93,6 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_IMPORT_ERR_IMPORTPROC_31", "D00231: The specified file by -f option is invalid." },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_32", "D00232: There is no target container in the file." },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_33", "D00233: An unexpected error occurred while importing row data." },
-			{ "MESS_IMPORT_ERR_IMPORTPROC_34", "D00234: An unexpected error occurred while creating trigger." },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_35", "D00235: An ACL file does not exist." },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_36", "D00236: The same user that the user information is different has already existed." },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_37", "D00237: The same database that the database setting is different has already existed." },
@@ -303,9 +302,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_5", "D00905: An unexpected error occurred while converting container information to json." },
 			{ "MESS_COMM_ERR_METAINFO_6", "D00906: An unexpected error occurred while converting container information to json." },
 			{ "MESS_COMM_ERR_METAINFO_7", "D00907: An unexpected error occurred while checking UTF-8 BOM." },//
-			{ "MESS_COMM_ERR_METAINFO_8", "D00908: An unexpected error occurred while parsing HI properties." },//
 			{ "MESS_COMM_ERR_METAINFO_9", "D00909: An unexpected error occurred while parsing timeseries properties." },//
-			{ "MESS_COMM_ERR_METAINFO_10", "D00910: An unexpected error occurred while parsing trigger properties." },//
 			{ "MESS_COMM_ERR_METAINFO_11", "D00911: An unexpected error occurred while parsing index properties." },//
 			{ "MESS_COMM_ERR_METAINFO_12", "D00912: An unexpected error occurred while parsing column properties." },//
 			{ "MESS_COMM_ERR_METAINFO_13", "D00913: An unexpected error occurred while parsing column type." },//
@@ -319,7 +316,6 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_20", "D00920: The column name of the index information is not set." },//
 			{ "MESS_COMM_ERR_METAINFO_21", "D00921: The index type of the index information is not set." },//
 			{ "MESS_COMM_ERR_METAINFO_22", "D00922: The column name of the index information does not exist in the column information." },//
-			{ "MESS_COMM_ERR_METAINFO_23", "D00923: The column name of the trigger information does not exist in the column information." },//
 			{ "MESS_COMM_ERR_METAINFO_24", "D00924: The column name of HI information does not exist in the column information." },//
 			{ "MESS_COMM_ERR_METAINFO_25", "D00925: An unexpected error occurred while checking container information." },//
 
@@ -345,6 +341,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_44", "D00944: The file specified by \"--filterfile\" is invalid." },
 			{ "MESS_COMM_ERR_METAINFO_45", "D00945: An unexpected error occurred while reading the file specified by \"--filterfile\". " },
 			{ "MESS_COMM_ERR_METAINFO_46", "D00946: The partitioned table exported in format before V4 will be skipped." },
+			{ "MESS_COMM_ERR_METAINFO_47", "D00947: Interval partition table must be set when (interval_worker_group or interval_worker_group_position) are specified" },
 
 			{ "MESS_COMM_PROC_CMD_1", "A command duplicate check start." },
 			{ "MESS_COMM_PROC_CMD_2", "A command line parameter persing start." },
@@ -400,7 +397,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_42", "D00A42: [--prefixdb] option and [--container] option must be set at same time." },//
 			{ "MESS_COMM_ERR_CMD_44", "D00A44: [--list] option is not available at the same time as [--all] option, [--db] option, or [--container] option." },//
 			{ "MESS_COMM_ERR_CMD_45", "D00A45: [--parallel] option is invalid. Set a integer value between 2-16." },//
-			{ "MESS_COMM_ERR_CMD_46", "D00A46: [--acl] option and [--all] option must be set at same time." },//
+			{ "MESS_COMM_ERR_CMD_46", "D00A46: [--acl] option and [--all] option or [--db] option must be set at same time." },//
 			{ "MESS_COMM_ERR_CMD_47", "D00A47: [--parallel] option is available at same time as [--binary] option and [--out] option." },//
 			{ "MESS_COMM_ERR_CMD_48", "D00A48: Property [load.input.threadNum] is invalid. Set a integer value between 1-128." },//
 			{ "MESS_COMM_ERR_CMD_49", "D00A49: Property [load.output.threadNum] is invalid. Set a integer value between 1-16." },//
@@ -411,6 +408,7 @@ public class messageResource extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_56", "D00A56: [--intervals] option is invalid. Specify a value yyyyMMdd(from):yyyyMMdd(to) format and specify so that from < to." },//
 			{ "MESS_COMM_ERR_CMD_57", "D00A57: Property [intervalTimeZone] is invalid. Specify TimeZone or GMT+HH:mm format." },//
 			{ "MESS_COMM_ERR_CMD_58", "D00A58: [--intervals] option and [--filterfile] option cannot be set at same time." },//
+			{ "MESS_COMM_ERR_CMD_59", "D00A59: [--progress] option is invalid. Please set positive integer number." },//
 
 			{ "MESS_COMM_PROC_PROCINFO_1", "The container name which did not be processed has been detected." },//
 			{ "MESS_COMM_PROC_PROCINFO_2", "(%d/%d)Container %s is imported %s.(%s)" },//

@@ -164,6 +164,12 @@ public class ToolContainerInfo {
 	private List<String> JSONrowKeySetStringValueList = null;
 
 	/**
+	 * V5.4 [expimp] Handling data deviation
+	 */
+	private Integer intervalWorkerGroup    = null;
+	private Integer intervalWorkerGroupPos = null;
+
+	/**
 	 * コンストラクタ
 	 */
 	public ToolContainerInfo() {
@@ -1100,6 +1106,16 @@ public class ToolContainerInfo {
 		//WITH (プロパティキー=プロパティ値, ...)"の形式で指定することができます。
 		// (V4.0) ロウ期限解放
 		// (V4.1) パーティション期限解放
+		// (V5.4) add interval worker group to handling data deviation
+		ArrayList<String> withList = new ArrayList<String>();
+		String iwgPropertiesStr = this.getIntervalWorkerGroupPropertiesString();
+		if (iwgPropertiesStr != null && iwgPropertiesStr.length() > 0) {
+			withList.add(iwgPropertiesStr);
+		}
+		if (this.getDataAffinity() != null) {
+			withList.add("DATA_AFFINITY='" + this.getDataAffinity() + "'");
+		}
+
 		if (this.hasAdditionalProperty()) {
 			StringBuilder timePropertyStr = new StringBuilder();
 			boolean additional = false;
@@ -1127,13 +1143,8 @@ public class ToolContainerInfo {
 				}
 				if ( additional == true ){
 					// (V4.3.1) CREATE TABLEにてデータアフィニティを設定
-					builder.append("WITH(");
-					if (this.getDataAffinity() != null) {
-						builder.append("DATA_AFFINITY='" + this.getDataAffinity() + "',");
-					}
-					builder.append("expiration_type='ROW',");
-					builder.append(timePropertyStr);
-					builder.append(")");
+					withList.add("expiration_type='ROW'");
+					withList.add(timePropertyStr.toString());
 				}
 			}
 
@@ -1142,29 +1153,13 @@ public class ToolContainerInfo {
 			if (additional != true && this.getExpirationInfo() != null) {
 				ExpirationInfo expInfo = this.getExpirationInfo();
 				// (V4.3.1) CREATE TABLEにてデータアフィニティを設定
-				builder.append("WITH(");
-				if (this.getDataAffinity() != null) {
-					builder.append("DATA_AFFINITY='" + this.getDataAffinity() + "',");
-				}
-				builder.append(String.format("expiration_type='%s', expiration_time=%d, expiration_time_unit='%s') ",
+				withList.add(String.format("expiration_type='%s', expiration_time=%d, expiration_time_unit='%s'",
 						expInfo.getType(), expInfo.getTime(), expInfo.getTimeUnit().toString()));
-			} else if (additional != true && this.getExpirationInfo() == null) {
-				// 時系列オプションを保持しているが期限解放情報を保持していない場合（CREATE TABLEにてexpiration_typeを指定しない場合）
-				// (V4.3.1) データアフィニティの情報がある場合、CREATE TABLEにてデータアフィニティを設定
-				if (this.getDataAffinity() != null) {
-					builder.append("WITH(");
-					builder.append("DATA_AFFINITY='" + this.getDataAffinity()+ "'");
-					builder.append(")");
-				}
 			}
-		} else {
-			// 時系列オプションを保持していない AND 期限解放情報を保持していない場合（CREATE TABLEにてexpiration_typeを指定しない場合）
-			// (V4.3.1) データアフィニティの情報がある場合、CREATE TABLEにてデータアフィニティを設定
-			if (this.getDataAffinity() != null) {
-				builder.append("WITH(");
-				builder.append("DATA_AFFINITY='" + this.getDataAffinity()+ "'");
-				builder.append(")");
-			}
+		}
+
+		if (withList.size() > 0) {
+			builder.append(" WITH (").append(String.join(",", withList)).append(") ");
 		}
 
 		// テーブルパーティショニング
@@ -2480,4 +2475,57 @@ public class ToolContainerInfo {
 
 		return true;
 	}
+
+	/**
+	 * Get Interval Worker Group
+	 *
+	 * @return Interval Worker Group value
+	 */
+	public Integer getIntervalWorkerGroup(){
+		return intervalWorkerGroup;
+	}
+
+	/**
+	 * Get Interval Worker Group position
+	 *
+	 * @return Interval Worker Group position value
+	 */
+	public Integer getIntervalWorkerGroupPos(){
+		return this.intervalWorkerGroupPos;
+	}
+
+	/**
+	 * Set Interval Worker Group
+	 *
+	 * @param value the value to set
+	 */
+	public void setIntervalWorkerGroup(Integer value){
+		this.intervalWorkerGroup = value;
+	}
+
+	/**
+	 * Set Interval Worker Group position
+	 *
+	 * @param value the value to set
+	 */
+	public void setIntervalWorkerGroupPos(Integer value){
+		this.intervalWorkerGroupPos = value;
+	}
+
+	/**
+	 * Get Interval Worker Group properties list
+	 *
+	 * @return the comma separated properties list in a string
+	 */
+	public String getIntervalWorkerGroupPropertiesString() {
+		ArrayList<String> propertiesList = new ArrayList();
+		if (this.intervalWorkerGroup != null) {
+			propertiesList.add("interval_worker_group=" + this.intervalWorkerGroup + "");
+		}
+		if (this.intervalWorkerGroupPos != null) {
+			propertiesList.add("interval_worker_group_position=" + this.intervalWorkerGroupPos + "");
+		}
+		return String.join(", ", propertiesList);
+	}
+
 }

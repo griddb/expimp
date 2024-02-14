@@ -246,21 +246,79 @@ $ gs_export --all -u admin/admin -d ./20210131/ --intervals 20210101:20210131
 - The --all option specifies all containers, of which only date accumulation containers are used for output.
 - As multiple row data files are output, it is recommended to specify the destination directory using the -d option together with the --all option.
 
-### How to specify user access rights  
+#### How to specify user access rights
 
-Information on GridDB cluster users and their access rights can also be exported.  Use the following command when migrating all data in the cluster.
+Information on GridDB cluster users and their access rights can also be
+exported. Use the following command when migrating all data in the
+cluster.
 
-- Specify the --all option and --acl option. However, only user information of a general user can be exported. Migrate the data on the administrator user separately (copy the user definition file).
+- The [--acl] option must be used with the [--all] option or the [--db] option . However, only user information of a general user can be exported. Migrate the data on the administrator user separately (copy the user definition file).
 
-[Example]
+1. Specify the `--all` option and `--acl` option.
 
-``` example
-$ gs_export --all -u admin/admin --acl
-```
+    \[Example\]
 
-[Memo]
--   The command needs to be executed by an administrator user.
+    ```example
+    $ gs_export --all -u admin/admin --acl
+    ```
 
+2. Specify the `--db` option and `--acl` option.
+
+    \[Example\]
+
+    ```
+    $ gs_export --db testdb1 testdb2 -u admin/admin --acl
+    ```
+
+\[Memo\]
+
+- The command needs to be executed by an administrator user.
+
+- For v4.5 metadata file `gs_export_acl.json` add and change some out parameters:
+
+  | Tag Name                     | Value                  | Note                                                                |
+  | ---------------------------- | ---------------------- | ------------------------------------------------------------------- |
+  | /user[n]/isRole              | true or false          | whether it is a role. <br />true: is a role <br />false: not a role |
+  | /user[n]/username            | user name or role name | Indicates the name of the user or the name of the role.             |
+  | /database[n]/acl[n]/username | user name or role name | Indicates the name of the user or the name of the role.             |
+
+  Example of `gs_export_acl.json` v4.5
+
+  ```
+  {
+      "version":"4.5.0",
+      "user":
+      [
+          {
+              "isRole":false,
+              "username":"user1",
+              "password":"..."
+          },
+          {
+              "isRole":true,
+              "username":"role01",
+          }
+      ],
+      "database":
+      [
+          {
+              "name":"db1",
+              "acl":
+              [
+                  {
+                      "username":"user1",
+                      "role":"READ"
+                  },
+                  {
+                      "username":"role01",
+                      "role":"READ"
+                  }
+              ]
+          }
+      ]
+  }
+
+  ```
 
 #### How to specify a view
 
@@ -505,17 +563,28 @@ There are 3 ways to specify a container, by specifying all the containers in the
 
 If data is exported by specifying the --acl option in the export function, data on the user and access rights can also be imported.  Use the following command when migrating all data in the cluster.
 
-- Specify the --all option and --acl option.
+1. Specify the `--all` option and `--acl` option.
 
-[Example]
+    \[Example\]
 
-``` example
-$ gs_import --all --acl -u admin/admin
-```
+    ```example
+    $ gs_import --all --acl -u admin/admin
+    ```
 
-[Memo]
+2. Specify the `--db` option and `--acl` option.
+
+    \[Example\]
+
+    ```
+    $ gs_import --db testdb1 testdb2 --acl -u admin/admin
+    ```
+
+\[Memo\]
+
 - The command needs to be executed by an administrator user.
-- Use the following command when migrating all data in the cluster. Execute the command without any databases and general users existing in the migration destination.
+- Use the following command when migrating all data in the cluster.
+  Execute the command without any databases and general users existing
+  in the migration destination.
 
 
 ##### How to specify a view
@@ -661,6 +730,45 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 **Detailed settings in the operating display**  
 -   Processing details can be displayed by specifying the --verbose option.
 
+**Progress output log when importing container**
+
+- Executed row numbers can be displayed in the log file by specifying the `--process <interval row number>` option.
+- Interval row number must be positive integer number.
+
+\[Example\]
+
+```
+$ gs_import --all -u admin/admin --process 10
+Import Start.
+Number of target containers : 100
+
+test.dummy : 1
+
+Number of target containers:1 ( Success:1  Failure:0 )
+Import Completed.
+```
+
+Log output in `gs_expimp-YYYYMMDD.log`:
+
+```
+2023-04-26T17:49:29.413Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importMain [importMain.java::45] Import Start. :Version 5.3.00
+2023-04-26T17:49:29.482Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.propertiesInfo [propertiesInfo.java::361] Property : notificationMember=[10.0.0.124:10001] jdbcNotificationMember=[10.0.0.124:20001] clusterName=[MyCluster] commitCount=[1000] transactionTimeout=[2147483647] failoverTimeout=[10] jdbcLoginTimeout=[10]
+2023-04-26T17:49:29.483Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.cmdAnalyze [cmdAnalyze.java::737] Parameter : --all --user=[admin] --directory=[csvtest2] --progress
+2023-04-26T17:49:29.565Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::208] Get Container Information from metaInfoFile. : containerCount=[1] time=[72]
+2023-04-26T17:49:30.209Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 10 rows imported.
+2023-04-26T17:49:30.222Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 20 rows imported.
+2023-04-26T17:49:30.234Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 30 rows imported.
+2023-04-26T17:49:30.246Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 40 rows imported.
+2023-04-26T17:49:30.260Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 50 rows imported.
+2023-04-26T17:49:30.275Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 60 rows imported.
+2023-04-26T17:49:30.290Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 70 rows imported.
+2023-04-26T17:49:30.303Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 80 rows imported.
+2023-04-26T17:49:30.318Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 90 rows imported.
+2023-04-26T17:49:30.327Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::1151] dummy: 100 rows imported.
+2023-04-26T17:49:30.358Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importProcess [importProcess.java::983] import: db,test,name,dummy,rowCount,100,Time all,508,put,30,readRow,26,readMeta,4,createDrop,30,search,29,other,389
+2023-04-26T17:49:30.363Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.commandProgressStatus [commandProgressStatus.java::112] Number of target containers:1 ( Success:1  Failure:0 )
+2023-04-26T17:49:30.364Z INFO [main] com.toshiba.mwcloud.gs.tools.expimp.importMain [importMain.java::91] Import Completed.: time=[962]
+```
 
 ## Command/option specifications
 
@@ -689,7 +797,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | --filterfile \<definition file name\> | | Specify the definition file in which the search query used to export rows is described. All rows are exported by default.   |
   | --intervals YYYYMMdd:YYYYMMdd          |      | If a container to be exported from is a date accumulation container, specify the date range for which rows are retrieved for export in "YYYYMMdd:YYYYMMdd" format, consisting of a start date and an end date separated by a colon. If the date range is not specified, all rows will be exported.  The "intervals" option cannot be combined with the "filterfile" option.   |
   | --parallel \<no. of parallel executions\> | | Execute in parallel for the specified number. When executed in parallel, the export data will be divided by the same number as the number of parallel executions. This can be specified only for the multi-container format (when the --out option is specified). A range from 2 to 32 can be specified.      |
-  | --acl | | Data on the database, user, access rights will also be exported. This can be specified only if the user is an administrator user and --all option is specified. |
+  | --acl | | Data on the database, user, access rights will also be exported. This can be specified only if the user is an administrator user and the --all option or the --db option is specified. |
   | --prefixdb \<database name\> | | If a --container option is specified, specify the database name of the container. The containers in the default database will be processed if they are omitted. |
   | --force | | Processing is forced to continue even if an error occurs. Error descriptions are displayed in a list after processing ends.          |
   | -t\|--test | | Execute the tool in the test mode.                  |
@@ -712,7 +820,7 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
 
   | Command | Option/argument |
   |---------------------|--------------------------------------|
-  | gs_import | -u｜--user \<User name\>/\<Password\><br>--all ｜ --db \<database name\> \[\<database name\>\] \| ( --container \<container name\> \[\<container name\>\] ... \| --containerregex \<regular expression\> \[\<regular expression\>\] ...)<br>--db \<database name\> \[\<database name\>\]<br>\[--append｜--replace\]<br>\[-d｜--directory \<import target directory path\>\]<br>\[-f｜--file \<file name\> \[\<file name\> ...\]\]<br>\[--count \<commit count\>\]<br>\[--acl\]<br>\[--prefixdb \<database name\>\]<br>\[--force\]<br>\[--schemaCheckSkip\]<br>\[-v｜--verbose\]<br>\[--silent\]      |
+  | gs_import | -u｜--user \<User name\>/\<Password\><br>--all ｜ --db \<database name\> \[\<database name\>\] \| ( --container \<container name\> \[\<container name\>\] ... \| --containerregex \<regular expression\> \[\<regular expression\>\] ...)<br>--db \<database name\> \[\<database name\>\]<br>\[--append｜--replace\]<br>\[-d｜--directory \<import target directory path\>\]<br>\[-f｜--file \<file name\> \[\<file name\> ...\]\]<br>\[--count \<commit count\>\]<br>\[--acl\]<br>\[--prefixdb \<database name\>\]<br>\[--force\]<br>\[--schemaCheckSkip\]<br>\[-v｜--verbose\]<br>\[--silent\]<br>\[--progress \<interval number of rows\>\]     |
   | gs_import | -l｜--list<br>\[-d｜--directory \<directory path\>\]<br>\[-f｜--file \<file name\> \[\<file name\> ...\]\]      |
   | gs_import | --version                                   |
   | gs_import | \[-h｜--help\]                                         |
@@ -732,11 +840,12 @@ $ gs_import --all -u admin/admin -d /data/expdata --force
   | \-f\|--file \<file name\> [\<file name\> ...]   |          | Specify the container data file to be imported. Multiple specifications allowed. All container data files of the current directory or directory specified in d (--directory) will be applicable by default.   |
   | --intervals YYYYMMdd:YYYYMMdd          |      | If a container to be imported from is a date accumulation container, specify the date range for which rows data files are retrieved for import in "YYYYMMdd:YYYYMMdd" format, consisting of a start date and an end date separated by a colon. If the date range is not specified, all row data files will be imported.   |
   | \--count \<commit count\>                        |          | Specify the number of input cases until the input data is committed together. |
-  | \--acl                                           |          | Data on the database, user, access rights will also be imported. This can be specified only if the user is an administrator user and the --all option is specified for data exported by specifying the --acl option.   |
+  | \--acl                                           |          | Data on the database, user, access rights will also be imported. This can be specified only if the user is an administrator user and the --all option or the --db option is specified for data exported by specifying the --acl option.   |
   | \--prefixdb \<database name\>                    |          | If a --container option is specified, specify the database name of the container. The containers in the default database will be processed if they are omitted.        |
   | \--force                                         |          | Processing is forced to continue even if an error occurs. Error descriptions are displayed in a list after processing ends.   |
   | \--schemaCheckSkip                               |          | When --append option is specified, a schema check of the existing container will not be executed.   |
   | \-v\|--verbose                                    |          | Output the operating display details.      |
+  | \--progress \<interval number of rows\>          |          | Write in log file after an interval number of rows were imported  |
   | \--silent                                        |          | Operating display is not output.  |
   | \-l\|--list                                       |          | Display a list of the specified containers to be imported.  |
   | \--version                                       |          | Display the version of the tool.   |
@@ -781,15 +890,15 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
 | dataAffinity | Data affinity name | Specify the data affinity name. | Arbitrary             |
 | partitionNo | Partition | Null string indicates no specification. | Arbitrary, output during export. Not used even if it is specified when importing.    |
 | columnSet | Column data set (, schema data) | Column data needs to match when adding data to an existing container | Required    |
-|     columnName | Column name | | Required              |
-|     type | JSON Data type | Specify either of the following values: BOOLEAN/ STRING/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP/ GEOMETRY/ BLOB/ BOOLEAN\[\]/ STRING\[\]/ BYTE\[\] /SHORT. \[\]/ INTEGER\[\]/ LONG\[\]/ FLOAT\[\]/ DOUBLE\[\]/ TIMESTAMP\[\]. | Required    |
-|     notNull | NOT NULL constraint | true/false | Arbitrary, "false" by default   |
+| &emsp;columnName | Column name | | Required              |
+| &emsp;type | JSON Data type | Specify either of the following values: BOOLEAN/ STRING/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP/ GEOMETRY/ BLOB/ BOOLEAN\[\]/ STRING\[\]/ BYTE\[\] /SHORT. \[\]/ INTEGER\[\]/ LONG\[\]/ FLOAT\[\]/ DOUBLE\[\]/ TIMESTAMP\[\]. | Required    |
+| &emsp;notNull | NOT NULL constraint | true/false | Arbitrary, "false" by default   |
 | rowKeyAssigned | Row key setting (\*1) | specify either true/false<br>Specifying also rowKeySet causes an error | Arbitrary, "false" by default     |
 | rowKeySet | Row key column names | Specify row key column names in array format.<br>The row key needs to match when adding data to an existing container | Arbitrary (\*2)    |
 | indexSet | Index data set | Can be set for each column.  Non-existent column name will be ignored or an error will be output. | Arbitrary      |
-|     columnNames | Column names | Specify column names in array format. | Arbitrary (essential when indexSet is specified)     |
-|     type | Index type | Specify one of the following values: TREE (STRING/ BOOLEAN/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP) or SPATIAL (GEOMETRY). | Arbitrary (essential when indexSet is specified)      |
-|     indexName | Index name | Index name | Arbitrary, not specified either by default or when null is specified.     |
+| &emsp;columnNames | Column names | Specify column names in array format. | Arbitrary (essential when indexSet is specified)     |
+| &emsp;type | Index type | Specify one of the following values: TREE (STRING/ BOOLEAN/ BYTE/ SHORT/ INTEGER/ LONG/ FLOAT/ DOUBLE/ TIMESTAMP) or SPATIAL (GEOMETRY). | Arbitrary (essential when indexSet is specified)      |
+| &emsp;indexName | Index name | Index name | Arbitrary, not specified either by default or when null is specified.     |
 | Table partitioning data  |                 |     |      |
 | tablePartitionInfo | Table partitioning data | For Interval-Hash partitioning, specify the following group of items for both Interval and Hash as an array in that order | Arbitrary     |
 | type | Table partitioning type | Specify either HASH or INTERVAL | Essential if tablePartitionInfo is specified |
@@ -805,6 +914,9 @@ The tag and data items of the metadata in the JSON format are shown below. Tags 
 | timeIntervalInfo     | Time interval information         | For a date accumulation container, describe the following information in array format. | Arbitrary     |
 | containerFile        | Container data file name     | File name  | Required if timeIntervalInfo is specified |
 | boundaryValue        | Date range                | date to start container data      | Required if timeIntervalInfo is specified |
+| intervalWorkerGroup                                   | Interval worker group               | Specify what worker group is the container on                                                                                                                                                                             | Essential if containerType is TIME_SERIES or COLLECTION and tablePartitionInfo's type is INTERVAL and the partitioning key is TIMESTAMP |
+| intervalWorkerGroupPosition                           | Position of interval worker group   | Specify the position of the worker group                                                                                                                                                                                  | Essential if containerType is TIME_SERIES or COLLECTION and tablePartitionInfo's type is INTERVAL and the partitioning key is TIMESTAMP |
+
 
 - \* 1: Information output to metadata file before V4.2. Use rowKeySet in V4.3 or later.
 - \* 2: Required when containerType is TIME_SERIES and rowKeyAssigned is false.
@@ -1179,3 +1291,25 @@ For import purposes, any file name can be used for the external object file. Lis
   1,10,15,20,40,70,71,72,73,74
   ```
 
+
+## Avoid data deviation
+
+Data deviation can happen when registering a large amount of data into containers.
+To avoid that, these parameters are added to metadata file when exporting/importing containers those are interval partition (timeseries or collection) AND the partitioning key is TIMESTAMP:
+
+| Item                        | Description                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| intervalWorkerGroup         | Specify what worker group is the container on; corresponding to PARTITION_INTERVAL_WORKER_GROUP     |
+| intervalWorkerGroupPosition | Specify the position of the worker group; corresponding to PARTITION_INTERVAL_WORKER_GROUP_POSITION |
+
+- Export:
+  System will get all the data from #tables table. If the data contains PARTITION_INTERVAL_WORKER_GROUP, PARTITION_INTERVAL_WORKER_GROUP_POSITION it will set their value for the corresponding parameters in the metadata file (<database_name>.<container_name>\_properties.json).
+
+- Import:
+  System will read from metadatafile (<database_name>.<container_name>\_properties.json)
+  - If intervalWorkerGroup's values exists: Adds `WITH (PARTITION_INTERVAL_WORKER_GROUP = <value of intervalWorkerGroup>)` to `CREATE TABLE` statement.
+  - If both intervalWorkerGroup and intervalWorkerGroupPosition's values exists: Adds `WITH (PARTITION_INTERVAL_WORKER_GROUP = <value of intervalWorkerGroup> AND PARTITION_INTERVAL_WORKER_GROUP_POSITION = <value of intervalWorkerGroupPosition>)` to `CREATE TABLE` statement
+  - If intervalWorkerGroupPosition's value is null or intervalWorkerGroup's value is null:
+    - System will catch the exception returned from server.
+  - If tablePartitionInfo does not exist but intervalWorkerGroupPosition's value or intervalWorkerGroup's value is not null:
+    - System will throw exception with error message: Interval partition table must be set when (interval_worker_group or interval_worker_group_position) are specified

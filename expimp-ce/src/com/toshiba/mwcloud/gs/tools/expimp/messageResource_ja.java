@@ -92,7 +92,6 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_IMPORT_ERR_IMPORTPROC_31", "D00231: -fオプションで指定されたファイルが不正です" },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_32", "D00232: 対象コンテナがファイルに存在しません" },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_33", "D00233: ロウデータのインポート処理でエラーが発生しました" },
-			{ "MESS_IMPORT_ERR_IMPORTPROC_34", "D00234: トリガーの作成処理でエラーが発生しました" },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_35", "D00235: ACLファイルが存在していません。" },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_36", "D00236: 同じユーザ名で異なる設定のユーザが存在します" },
 			{ "MESS_IMPORT_ERR_IMPORTPROC_37", "D00237: 同じデータベース名で異なる設定のデータベースが存在します" },
@@ -302,9 +301,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_5", "D00905: コンテナ情報のJSON化処理で変換エラーが発生しました" },
 			{ "MESS_COMM_ERR_METAINFO_6", "D00906: コンテナ情報のJSON化処理でエラーが発生しました" },
 			{ "MESS_COMM_ERR_METAINFO_7", "D00907: UTF-8のBOM処理でエラーが発生しました" },//
-			{ "MESS_COMM_ERR_METAINFO_8", "D00908: 誤差あり間引き圧縮情報の解析処理でエラーが発生しました" },//
 			{ "MESS_COMM_ERR_METAINFO_9", "D00909: 時系列プロパティ情報の解析処理でエラーが発生しました" },//
-			{ "MESS_COMM_ERR_METAINFO_10", "D00910: トリガー情報の解析処理でエラーが発生しました" },//
 			{ "MESS_COMM_ERR_METAINFO_11", "D00911: 索引情報の解析処理でエラーが発生しました" },//
 			{ "MESS_COMM_ERR_METAINFO_12", "D00912: カラム情報の解析処理でエラーが発生しました" },//
 			{ "MESS_COMM_ERR_METAINFO_13", "D00913: カラム種別の解析処理でエラーが発生しました" },//
@@ -318,7 +315,6 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_20", "D00920: 索引情報のカラム名が設定されていません" },//
 			{ "MESS_COMM_ERR_METAINFO_21", "D00921: 索引情報の索引種別が設定されていません" },//
 			{ "MESS_COMM_ERR_METAINFO_22", "D00922: 索引情報のカラム名はカラム情報に登録されていません" },//
-			{ "MESS_COMM_ERR_METAINFO_23", "D00923: トリガー情報のカラム名はカラム情報に登録されていません" },//
 			{ "MESS_COMM_ERR_METAINFO_24", "D00924: 誤差あり間引き圧縮情報のカラム名はカラム情報に登録されていません" },//
 			{ "MESS_COMM_ERR_METAINFO_25", "D00925: コンテナ情報の検査処理でエラーが発生しました" },//
 
@@ -344,6 +340,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_METAINFO_44", "D00944: --filterfileで指定されたファイルの定義に誤りがあります。" },
 			{ "MESS_COMM_ERR_METAINFO_45", "D00945: --filterfileで指定されたファイルの読み込みでエラーが発生しました。" },
 			{ "MESS_COMM_ERR_METAINFO_46", "D00946: V4より前のエクスポート形式で出力されたパーティショニングコンテナはスキップします。" },
+			{ "MESS_COMM_ERR_METAINFO_47", "D00947: (interval_worker_groupまたはinterval_worker_group_position)を指定する場合はインターバルパーティショニングテーブルが必須です。" },
 
 			{ "MESS_COMM_PROC_CMD_1", "コマンド重複チェック処理を開始します" },
 			{ "MESS_COMM_PROC_CMD_2", "コマンドラインパラメタ解析処理を開始します" },
@@ -399,7 +396,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_42", "D00A42: [--prefixdb]は、[--container]または[--containerregex]オプションと同時に使用してください" },//
 			{ "MESS_COMM_ERR_CMD_44", "D00A44: [--list]と[--all][--db][--container][--containerregex]は同時に設定できません" },//
 			{ "MESS_COMM_ERR_CMD_45", "D00A45: [--parallel]の値が不正です (2以上16以下の整数を指定してください)" },//
-			{ "MESS_COMM_ERR_CMD_46", "D00A46: [--acl]は、[--all]オプションと同時に使用してください" },//
+			{ "MESS_COMM_ERR_CMD_46", "D00A46: [--acl]は、[--all]オプション、または[--db]オプションと同時に使用してください" },//
 			{ "MESS_COMM_ERR_CMD_47", "D00A47: [--parallel]は、[--binary][--out]と同時に使用してください" },//
 			{ "MESS_COMM_ERR_CMD_49", "D00A49: プロパティ[load.output.threadNum]の値が不正です (1以上16以下の整数を指定してください)" },//
 			{ "MESS_COMM_ERR_CMD_48", "D00A48: プロパティ[load.input.threadNum]の値が不正です (1以上128以下の整数を指定してください)" },//
@@ -410,6 +407,7 @@ public class messageResource_ja extends ListResourceBundle {
 			{ "MESS_COMM_ERR_CMD_56", "D00A56: [--intervals]の値が不正です(yyyyMMdd（始点）:yyyyMMdd（終点）形式で指定して、始点 < 終点となるように指定してください)" },//
 			{ "MESS_COMM_ERR_CMD_57", "D00A57: プロパティ[intervalTimeZone]の値が不正です (タイムゾーン名またはGMT+HH:mm形式で指定してください)" },//
 			{ "MESS_COMM_ERR_CMD_58", "D00A58: [--intervals]と[--filterfile]は同時に設定できません" },//
+      { "MESS_COMM_ERR_CMD_59", "D00A59: [--progress]の値が不正です。正の整数を指定してください" },//
 
 			{ "MESS_COMM_PROC_PROCINFO_1", "処理されないコンテナ名が検出されました" },//
 			{ "MESS_COMM_PROC_PROCINFO_2", "(%d/%d)コンテナ　%s　のインポートに%sしました。（%s）" },//
