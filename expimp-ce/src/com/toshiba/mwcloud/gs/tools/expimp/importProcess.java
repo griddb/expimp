@@ -988,7 +988,7 @@ public class importProcess {
 				// ---------------------------
 				// Raw data registration
 				// ---------------------------
-				int count = importData(targetContainer, contInfo, 0, -1);
+				long count = importData(targetContainer, contInfo, 0, -1);
 
 				// ---------------------------
 				// Indexing
@@ -1071,13 +1071,13 @@ public class importProcess {
 	 * @return Number of registered rows
 	 * @throws GSEIException
 	 */
-	public int importData(Container<?, Row> container, ToolContainerInfo contInfo, int firstIndex, int lastIndex) throws GSEIException{
+	public long importData(Container<?, Row> container, ToolContainerInfo contInfo, int firstIndex, int lastIndex) throws GSEIException{
 
 		long startMultiPut = 0;
 		long endMultiPut = 0;
 		m_timePut = 0;
-		int rowIndex = 0;
-		int addRowCount = 0;
+		long rowIndex = 0;
+		long addRowCount = 0;
 
 		Calendar cal = Calendar.getInstance();
 		SimpleDateFormat sdf = new SimpleDateFormat(GSConstants.DATE_FORMAT_NOT_TIMEZONE);

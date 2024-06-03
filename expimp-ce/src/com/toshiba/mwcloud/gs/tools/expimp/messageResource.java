@@ -20,7 +20,7 @@ import java.util.ListResourceBundle;
  */
 public class messageResource extends ListResourceBundle {
 
-	public static final String VERSION_NUM = "5.5.00";
+	public static final String VERSION_NUM = "5.6.00";
 	public static final String VERSION = "V"+VERSION_NUM;
 	public static final String GS_EXPORT_CE = "gs_export-ce";
 	public static final String GS_IMPORT_CE = "gs_import-ce";
