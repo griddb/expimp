@@ -48,7 +48,7 @@ public class GSConstants {
 
 
 	/** Meta information file format version */
-	public static String EXPORT_MNG_FILE_VERSION		= "5.3.0";
+	public static String EXPORT_MNG_FILE_VERSION		= "5.6.0";
 
 	// V2.7.0 is not compatible with previous files
 	public static String EXPORT_MNG_FILE_VERSION_1		= "2.7.0";
@@ -81,8 +81,6 @@ public class GSConstants {
 	public static final String FILE_EXT_BINARY_SINGLE	= ".sc";
 	/** File extension (multi-container format in binary mode) */
 	public static final String FILE_EXT_BINARY_MULTI	= ".mc";
-	/** File extension (Avro file) */
-	public static final String FILE_EXT_AVRO			= ".avro";
 	/** File extension (JSON file) */
 	public static final String FILE_EXT_JSON			= ".json";
 
@@ -193,7 +191,7 @@ public class GSConstants {
 
 
 	public static final String DATE_FORMAT					= "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
-	public static final String DATE_FORMAT_BEFORE					= "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+	public static final String DATE_FORMAT_BEFORE			= "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 	public static final String DATE_FORMAT_NOT_TIMEZONE		= "yyyy-MM-dd'T'HH:mm:ss.SSS";
 	public static final String DATE_FORMAT_DAY			= "yyyy-MM-dd'T'00:00:00.000Z";
 	public static final String DATE_FORMAT_HOUR			= "yyyy-MM-dd'T'HH:00:00.000Z";
