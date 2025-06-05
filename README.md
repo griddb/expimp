@@ -10,9 +10,9 @@ Building and program execution are checked in the environment below.
 
     OS: Ubuntu22.04 (x64)
     Java: OpenJDK 1.8.0
-    GridDB Server: V5.7 CE (Community Edition)
-    GridDB Java Client: 5.7 CE (Community Edition)
-    GridDB JDBC: V5.7 CE (Community Edition)
+    GridDB Server: V5.8 CE (Community Edition)
+    GridDB Java Client: 5.8 CE (Community Edition)
+    GridDB JDBC: V5.8 CE (Community Edition)
     
 ## Quick start - Build and Run
 

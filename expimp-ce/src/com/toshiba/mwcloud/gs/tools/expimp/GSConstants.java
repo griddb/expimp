@@ -48,7 +48,7 @@ public class GSConstants {
 
 
 	/** Meta information file format version */
-	public static String EXPORT_MNG_FILE_VERSION		= "5.7.0";
+	public static String EXPORT_MNG_FILE_VERSION		= "5.8.0";
 
 	// V2.7.0 is not compatible with previous files
 	public static String EXPORT_MNG_FILE_VERSION_1		= "2.7.0";

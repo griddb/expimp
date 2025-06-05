@@ -13,7 +13,7 @@ sourceSets {
     }
 }
 
-def gridstoreVersion = '5.7.0'
+def gridstoreVersion = '5.8.0'
  
 dependencies { 
     implementation 'commons-io:commons-io:2.15.1'
